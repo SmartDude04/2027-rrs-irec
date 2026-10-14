@@ -24,6 +24,6 @@ void gpio_init() {
     HAL_GPIO_Init(GPIOC, &gpio_cfg);
 }
 
-extern "C" void SysTick_Handler(void) {
+void SysTick_Handler(void) {
     HAL_IncTick();
 }
