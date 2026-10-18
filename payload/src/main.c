@@ -27,4 +27,3 @@ void gpio_init() {
 void SysTick_Handler(void) {
     HAL_IncTick();
 }
-hello
