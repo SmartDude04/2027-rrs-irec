@@ -13,6 +13,8 @@
 #define PWR_MGMT_2   0x07
 #define ICM_WHO_AM_I 0x00
 #define ACCEL_CONFIG 0x14
+#define ICM_BANK_CONFIG 0x7F
+
 
 
 struct ICM {
