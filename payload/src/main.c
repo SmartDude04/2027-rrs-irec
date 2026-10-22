@@ -3,12 +3,17 @@
 #include "tmp119.h"
 #include "I2C_DMA.h"
 #include "gpio.h"
+#include "ICM.h"
 
 void SystemClock_Config();
 void Error_Handler();
+void gpio_init();
+
 
 I2C_HandleTypeDef hi2c1;
-struct tmp119 temp_sensor;
+
+
+struct ICM icm_sensor;
 
 int main() {
     HAL_Init();
@@ -16,24 +21,40 @@ int main() {
     LED_Init();
     MX_USB_DEVICE_Init();
     I2C_Init(&hi2c1);
-
+	ICM_init();
+	gpio_init();
+	SerialWrite("Starting ICM-20948 test...\n");
     while (1) {
-        if (!temp_sensor.busy) {
-            TMP119_StartRead(&temp_sensor);
+        if (!icm_sensor.busy) {
+            ICM_StartAccel(&icm_sensor);
         }
-        if (temp_sensor.new_data) {
-            SerialWrite("Temp: %f\n", temp_sensor.temp);
-            temp_sensor.new_data = false;
+        if (icm_sensor.new_data) {
+            SerialWrite("Accel X: %f\tRawAccel: %d\n", icm_sensor.accelX, icm_sensor.rawX);
+            icm_sensor.new_data = false;
         }
         HAL_Delay(500);
     }
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
     if (hi2c == &hi2c1) {
-        TMP119_GetTemperature(&temp_sensor);
+        ICM_GetAccel(&icm_sensor);
+		
     }
 }
+
+void gpio_init() {
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	GPIO_InitStruct.Pin = GPIO_PIN_13;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+}
+
+
 
 /**
   * @brief System Clock Configuration
