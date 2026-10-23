@@ -13,6 +13,7 @@ void gpio_init();
 I2C_HandleTypeDef hi2c1;
 
 
+
 struct ICM icm_sensor;
 
 int main() {
@@ -21,18 +22,21 @@ int main() {
     LED_Init();
     MX_USB_DEVICE_Init();
     I2C_Init(&hi2c1);
-	ICM_init();
+	
 	gpio_init();
 	SerialWrite("Starting ICM-20948 test...\n");
+	ICM_init(&icm_sensor);
+	
     while (1) {
         if (!icm_sensor.busy) {
             ICM_StartAccel(&icm_sensor);
         }
         if (icm_sensor.new_data) {
-            SerialWrite("Accel X: %f\tRawAccel: %d\n", icm_sensor.accelX, icm_sensor.rawX);
+			
+			SerialWrite("X: %f  Y: %f  Z: %f\n",icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ);
             icm_sensor.new_data = false;
         }
-        HAL_Delay(500);
+        HAL_Delay(10);
     }
 }
 
@@ -40,7 +44,6 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
     if (hi2c == &hi2c1) {
         ICM_GetAccel(&icm_sensor);
-		
     }
 }
 
