@@ -1,8 +1,7 @@
-#include "SPI_DMA.h"
+#include "SPI.h"
 
-DMA_HandleTypeDef hdma_spi1_rx;
-DMA_HandleTypeDef hdma_spi1_tx;
-
+// DMA_HandleTypeDef hdma_spi1_rx;
+// DMA_HandleTypeDef hdma_spi1_tx;
 
 void SPI_Init(void)
 {
