@@ -1,9 +1,14 @@
 #include "usb_device.h"
 #include "usb_serial.h"
 #include "gpio.h"
+#include "SPI_DMA.h"
+#include "lora_sx1276.h"
 
 void SystemClock_Config(void);
 void Error_Handler(void);
+
+lora_sx1276 lora;
+uint8_t buf[32];
 
 int main(void)
 {
@@ -11,10 +16,17 @@ int main(void)
 	SystemClock_Config();
 	MX_USB_DEVICE_Init();
 	LED_Init();
+	SPI_Init();
+	uint8_t res = lora_init(&lora, &hspi1, GPIOA, GPIO_PIN_4, GPIOA, GPIO_PIN_3, 433000000);
+	// if (res != LORA_OK) {
+	// 	HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_RESET);
+	// 	SerialWrite("LORA Init Failed: %u", res);
+	// }
 
 	while (1)
 	{
-		SerialWrite("Hello, World\n");
+		res = lora_version(&lora);
+		SerialWrite("Version: %u\n", res);
 	}
 	
 }
