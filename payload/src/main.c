@@ -3,6 +3,9 @@
 #include "tmp119.h"
 #include "I2C_DMA.h"
 #include "gpio.h"
+#include "lora_sx1276.h"
+#include "SPI.h"
+#include "radio.h"
 
 void SystemClock_Config();
 void Error_Handler();
@@ -10,28 +13,27 @@ void Error_Handler();
 I2C_HandleTypeDef hi2c1;
 struct tmp119 temp_sensor;
 
+lora_sx1276 lora;
+
 int main() {
     HAL_Init();
     SystemClock_Config();
     LED_Init();
     MX_USB_DEVICE_Init();
-    I2C_Init(&hi2c1);
+	SPI_Init();
+	uint8_t res = lora_init(&lora, &hspi1, GPIOA, GPIO_PIN_4, GPIOA, GPIO_PIN_3, 433000000);
+	if (res != LORA_OK) {
+		SerialWrite("LORA Init Failed: %u", res);
+	}
 
     while (1) {
-        if (!temp_sensor.busy) {
-            TMP119_StartRead(&temp_sensor);
-        }
-        if (temp_sensor.new_data) {
-            SerialWrite("Temp: %f\n", temp_sensor.temp);
-            temp_sensor.new_data = false;
-        }
-        HAL_Delay(500);
+        res = lora_version(&lora);
+		SerialWrite("Version: 0x%u\n", res);
     }
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     if (hi2c == &hi2c1) {
-        TMP119_GetTemperature(&temp_sensor);
     }
 }
 

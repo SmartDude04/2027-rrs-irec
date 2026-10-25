@@ -1,8 +1,9 @@
 #include "usb_device.h"
 #include "usb_serial.h"
 #include "gpio.h"
-#include "SPI_DMA.h"
+#include "SPI.h"
 #include "lora_sx1276.h"
+#include "radio.h"
 
 void SystemClock_Config(void);
 void Error_Handler(void);
@@ -18,15 +19,14 @@ int main(void)
 	LED_Init();
 	SPI_Init();
 	uint8_t res = lora_init(&lora, &hspi1, GPIOA, GPIO_PIN_4, GPIOA, GPIO_PIN_3, 433000000);
-	// if (res != LORA_OK) {
-	// 	HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_RESET);
-	// 	SerialWrite("LORA Init Failed: %u", res);
-	// }
+	if (res != LORA_OK) {
+		SerialWrite("LORA Init Failed: %u", res);
+	}
 
 	while (1)
 	{
-		res = lora_version(&lora);
-		SerialWrite("Version: %u\n", res);
+		radio_test(&lora);
+		HAL_Delay(500);
 	}
 	
 }
