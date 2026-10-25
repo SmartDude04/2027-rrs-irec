@@ -1,7 +1,7 @@
 #include "usb_device.h"
 #include "usb_serial.h"
 #include "gpio.h"
-#include "SPI_DMA.h"
+#include "SPI.h"
 #include "lora_sx1276.h"
 
 void SystemClock_Config(void);
