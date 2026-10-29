@@ -4,6 +4,8 @@
 #include "I2C_DMA.h"
 #include "gpio.h"
 #include "ICM.h"
+#include "mpr.h"
+
 
 void SystemClock_Config();
 void Error_Handler();
@@ -15,6 +17,7 @@ I2C_HandleTypeDef hi2c1;
 
 
 struct ICM icm_sensor;
+struct MPR_DATA mpr_sensor;
 
 int main() {
     HAL_Init();
@@ -28,14 +31,20 @@ int main() {
 	ICM_init(&icm_sensor);
 	
     while (1) {
-        if (!icm_sensor.busy) {
+        /*if (!icm_sensor.busy) {
             ICM_StartAccel(&icm_sensor);
         }
+		
         if (icm_sensor.new_data) {
 			
 			SerialWrite("X: %f  Y: %f  Z: %f\n",icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ);
             icm_sensor.new_data = false;
         }
+		*/
+		if (!mpr_sensor.busy) {
+			MPR_Read(&mpr_sensor);
+		}
+		printf("Pressure: %f psi\n", mpr_sensor.pressure);
         HAL_Delay(10);
     }
 }
