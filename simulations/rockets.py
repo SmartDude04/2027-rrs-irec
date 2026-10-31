@@ -1,5 +1,7 @@
 from rocketpy import Rocket
 
+from motors import L1420R
+
 """
 All values are in meters and kilograms. All values are considered to be true values
 based on the OpenRocket drawings (Subscale_10-07-26.ork) unless otherwise noted.
@@ -50,6 +52,10 @@ drogue = subscale.add_parachute(
     height=1.5,
     porosity=0.0432,
 )
+
+subscale.add_motor(L1420R, position=0)
+
+subscale.evaluate_total_mass()
 
 if __name__ == "__main__":
     subscale.draw()
