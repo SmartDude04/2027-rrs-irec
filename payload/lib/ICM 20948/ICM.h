@@ -4,6 +4,7 @@
 #include "I2C_DMA.h"
 #include "stdbool.h"
 #include "stm32f4xx_hal.h"
+#include "usb_serial.h"
 
 #define ICM_ADDR     0x69<<1 // correct for 7-bit addressing
 
