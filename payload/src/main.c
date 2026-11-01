@@ -4,6 +4,7 @@
 #include "I2C_DMA.h"
 #include "gpio.h"
 #include "ICM.h"
+#include "mpr.h"
 
 void SystemClock_Config();
 void Error_Handler();
@@ -15,8 +16,9 @@ I2C_HandleTypeDef hi2c1;
 
 
 struct ICM icm_sensor;
+MPR_Data mprSensor;
 
-int main() {
+int main() { 
     HAL_Init();
     SystemClock_Config();
     LED_Init();
@@ -24,6 +26,7 @@ int main() {
     I2C_Init(&hi2c1);
 	
 	gpio_init();
+
 	SerialWrite("Starting ICM-20948 test...\n");
 	HAL_Delay(2000);
 	ICM_init(&icm_sensor);

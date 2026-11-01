@@ -16,6 +16,5 @@
 
 
 void LED_Init(void);
-int SPI_Init();
 
 #endif
