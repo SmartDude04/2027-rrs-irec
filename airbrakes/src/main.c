@@ -1,22 +1,72 @@
 #include "stm32h7xx_hal.h"
 #include "usb_device.h"
-#include "usbd_cdc_if.h"
-
+#include "usb_serial.h"
+#include "i2c.h"
+#include "gpio.h"
+#include "tmp119.h"
 void SystemClock_Config(void);
 void Error_Handler(void);
-void MPU_Config(void);
+static void MPU_Config(void);
+
+static struct tmp119 temp_sensor;
+
+static void LED_Init(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    __HAL_RCC_GPIOH_CLK_ENABLE();
+
+    GPIO_InitStruct.Pin = GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
+
+    // The onboard blue LED is active-low.
+    HAL_GPIO_WritePin(GPIOH, GPIO_PIN_7, GPIO_PIN_RESET);
+}
 
 int main(int argc, char **argv)
 {
     MPU_Config();
     HAL_Init();
     SystemClock_Config();
+    LED_Init();
     MX_USB_DEVICE_Init();
-    uint8_t buf[] = "hello, world\n";
+    MX_GPIO_Init();
+    MX_I2C1_Init();
+    
+
     while (1)
     {
-        CDC_Transmit_FS(buf, sizeof(buf)-1);
-        HAL_Delay(1000);
+        HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_7);
+      
+        //SerialWrite("Hello from STM32H7!\r\n");
+        if (!temp_sensor.busy) {
+            HAL_StatusTypeDef status = TMP119_StartRead(&temp_sensor);
+            printf("TMP119_StartRead returned %d\r\n", status);
+        }
+        if (temp_sensor.new_data) {
+            SerialWrite("Temperature: %.3f C\r\n", temp_sensor.temp);
+            temp_sensor.new_data = false;
+        }
+        HAL_Delay(500);
+    }
+}
+
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+    if (hi2c == &hi2c1) {
+        TMP119_GetTemperature(&temp_sensor);
+    }
+}
+
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
+{
+    if (hi2c == &hi2c1) {
+        TMP119_TransferFailed(&temp_sensor);
+        SerialWrite("TMP119 I2C error: 0x%08lX\r\n",
+                    (unsigned long)HAL_I2C_GetError(hi2c));
     }
 }
 
