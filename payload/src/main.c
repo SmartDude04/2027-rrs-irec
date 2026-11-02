@@ -17,6 +17,7 @@ I2C_HandleTypeDef hi2c1;
 
 struct ICM icm_sensor;
 MPR_Data mprSensor;
+struct tmp119 temp_sensor;
 
 int main() { 
     HAL_Init();
@@ -32,46 +33,54 @@ int main() {
 	ICM_init(&icm_sensor);
 	
     while (1) {
-        if (!icm_sensor.aBusy && !icm_sensor.gBusy) {
-			/* Only start one I2C DMA transfer at a time. */
-			ICM_StartAccel(&icm_sensor);
-        }
-	
-        if (icm_sensor.new_accel_data) {
+		if (!icm_sensor.aBusy &&
+			!icm_sensor.gBusy &&
+			!temp_sensor.busy) {
 			
-			SerialWrite("Accel X: %f Accel Y: %f Accel Z: %f\n",icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ);
-            icm_sensor.new_accel_data = false;
-        }
+				ICM_StartAccel(&icm_sensor);
+				while (icm_sensor.aBusy);
+				ICM_StartGyro(&icm_sensor);
+				while (icm_sensor.gBusy);
+				TMP119_StartRead(&temp_sensor);
+				while (temp_sensor.busy);
+		}
+
+		if (icm_sensor.new_accel_data) {
+			SerialWrite("Accel: %f, %f, %f\n", icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ);
+			icm_sensor.new_accel_data = false;
+		}
+
 		if (icm_sensor.new_gyro_data) {
-			SerialWrite("Gyro X: %f  Gyro Y: %f  Gyro Z: %f\n",icm_sensor.gyroX, icm_sensor.gyroY, icm_sensor.gyroZ);
+			SerialWrite("Gyro: %f, %f, %f\n", icm_sensor.gyroX, icm_sensor.gyroY, icm_sensor.gyroZ);
 			icm_sensor.new_gyro_data = false;
 		}
-        HAL_Delay(500);
-    }
+
+		if (temp_sensor.new_data) {
+			SerialWrite("Temp: %f\n", temp_sensor.temp);
+			temp_sensor.new_data = false;
+		}
+
+		HAL_Delay(1000);
+	}
 }
 
-void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
-	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    if (hi2c == &hi2c1) {
-		if (icm_sensor.aBusy) {
-			ICM_GetAccel(&icm_sensor);
-			/* Queue the gyro read after the accel read releases the bus. */
-			if (!icm_sensor.aBusy && !icm_sensor.gBusy) {
-				ICM_StartGyro(&icm_sensor);
-			}
-		} else if (icm_sensor.gBusy) {
-			ICM_GetGyro(&icm_sensor,false);
-			if (!icm_sensor.gBusy && !icm_sensor.aBusy) {
-				ICM_StartAccel(&icm_sensor);
-			}
-		}
-	}
-			
-		
-		
-		
-        
-    
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+    if (hi2c != &hi2c1) {
+        return;
+    }
+
+    if (icm_sensor.aBusy) {
+        ICM_GetAccel(&icm_sensor);
+	
+    }
+    else if (icm_sensor.gBusy) {
+        ICM_GetGyro(&icm_sensor, false);
+    }
+    else if (temp_sensor.busy) {
+        TMP119_GetTemperature(&temp_sensor);
+    }
 }
 
 void gpio_init() {
