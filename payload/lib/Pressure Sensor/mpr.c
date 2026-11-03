@@ -1,5 +1,22 @@
 #include "mpr.h"
 
+
+
+/*
+This function reads the pressure from the MPR sensor. It first sends a command to the sensor to initiate a pressure reading. 
+Then, it checks the status of the sensor to ensure that it is ready and not in an error state. 
+If the sensor is busy, it waits for a specified timeout period. 
+Once the sensor is ready, it reads the pressure data, processes it, and stores it in the provided MPR_Data structure. 
+The function returns an appropriate error code based on the outcome of the operation.
+
+@param result -- pointer to an MPR_Data structure where the read pressure data and status will be stored.
+@return MPR_errors -- an enumeration indicating the result of the read operation, which can be:
+    - MPR_OK: Successful read
+    - MPR_I2C_ERROR: I2C communication error
+    - MPR_TIMEOUT: Timeout waiting for sensor to be ready
+    - MPR_SENSOR_ERROR: Sensor error indicated by status register
+    - MPR_POWER_ERROR: Sensor is powered down or in an error state
+*/
 MPR_errors MPR_Read(MPR_Data *result)
 {
     
