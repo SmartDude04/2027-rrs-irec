@@ -5,9 +5,11 @@ uint8_t rx[2];
 HAL_StatusTypeDef TMP119_StartRead(struct tmp119 *dev) {
     HAL_StatusTypeDef ret = HAL_BUSY;
     if (!dev->busy) {
-        ret = HAL_I2C_Mem_Read_DMA(&hi2c1, TMP119_ADDR, TMP119_REG_TEMP, I2C_MEMADD_SIZE_8BIT, rx, 2);
         dev->busy = true;
+        ret = HAL_I2C_Mem_Read_DMA(&hi2c1, TMP119_ADDR, TMP119_REG_TEMP, I2C_MEMADD_SIZE_8BIT, rx, 2);
+       
     }
+     if (ret != HAL_OK) dev->busy = false;
     return ret;
 }
 

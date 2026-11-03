@@ -10,80 +10,87 @@ void SystemClock_Config();
 void Error_Handler();
 void gpio_init();
 
-
 I2C_HandleTypeDef hi2c1;
-
-
 
 struct ICM icm_sensor;
 MPR_Data mprSensor;
 struct tmp119 temp_sensor;
 
-int main() { 
-    HAL_Init();
-    SystemClock_Config();
-    LED_Init();
-    MX_USB_DEVICE_Init();
-    I2C_Init(&hi2c1);
-	
+int main()
+{
+	HAL_Init();
+	SystemClock_Config();
+	LED_Init();
+	MX_USB_DEVICE_Init();
+	I2C_Init(&hi2c1);
+
 	gpio_init();
 
 	SerialWrite("Starting ICM-20948 test...\n");
 	HAL_Delay(2000);
 	ICM_init(&icm_sensor);
-	
-    while (1) {
+
+	while (1)
+	{
+		// make sure last loop is "done" before starting the next one
 		if (!icm_sensor.aBusy &&
 			!icm_sensor.gBusy &&
-			!temp_sensor.busy) {
-			
-				ICM_StartAccel(&icm_sensor);
-				while (icm_sensor.aBusy);
-				ICM_StartGyro(&icm_sensor);
-				while (icm_sensor.gBusy);
-				TMP119_StartRead(&temp_sensor);
-				while (temp_sensor.busy);
+			!temp_sensor.busy)
+		{
+			// here is where you ensure that all the sensors are ready to be read from, and then you can start the next read cycle
+			ICM_StartAccel(&icm_sensor);
+			while (icm_sensor.aBusy)
+				;
+			ICM_StartGyro(&icm_sensor);
+			while (icm_sensor.gBusy)
+				;
+			TMP119_StartRead(&temp_sensor);
+			while (temp_sensor.busy)
+				;
 		}
+		if (icm_sensor.new_accel_data &&
+			icm_sensor.new_gyro_data &&
+			temp_sensor.new_data)
+		{
+			// this is where all the stuff is properly updated and should be referenced/called from
+			SerialWrite("A: %f, %f, %f | G: %f, %f, %f | T: %f\n",
+						icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ,
+						icm_sensor.gyroX, icm_sensor.gyroY, icm_sensor.gyroZ,
+						temp_sensor.temp);
 
-		if (icm_sensor.new_accel_data) {
-			SerialWrite("Accel: %f, %f, %f\n", icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ);
 			icm_sensor.new_accel_data = false;
-		}
-
-		if (icm_sensor.new_gyro_data) {
-			SerialWrite("Gyro: %f, %f, %f\n", icm_sensor.gyroX, icm_sensor.gyroY, icm_sensor.gyroZ);
 			icm_sensor.new_gyro_data = false;
-		}
-
-		if (temp_sensor.new_data) {
-			SerialWrite("Temp: %f\n", temp_sensor.temp);
 			temp_sensor.new_data = false;
 		}
 
-		HAL_Delay(1000);
+		HAL_Delay(100);
 	}
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    if (hi2c != &hi2c1) {
-        return;
-    }
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+	if (hi2c != &hi2c1)
+	{
+		return;
+	}
 
-    if (icm_sensor.aBusy) {
-        ICM_GetAccel(&icm_sensor);
-	
-    }
-    else if (icm_sensor.gBusy) {
-        ICM_GetGyro(&icm_sensor, false);
-    }
-    else if (temp_sensor.busy) {
-        TMP119_GetTemperature(&temp_sensor);
-    }
+	if (icm_sensor.aBusy)
+	{
+		ICM_GetAccel(&icm_sensor);
+	}
+	else if (icm_sensor.gBusy)
+	{
+		ICM_GetGyro(&icm_sensor, false);
+	}
+	else if (temp_sensor.busy)
+	{
+		TMP119_GetTemperature(&temp_sensor);
+	}
 }
 
-void gpio_init() {
+void gpio_init()
+{
 	__HAL_RCC_GPIOC_CLK_ENABLE();
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 	GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -93,12 +100,10 @@ void gpio_init() {
 	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 }
 
-
-
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+ * @brief System Clock Configuration
+ * @retval None
+ */
 void SystemClock_Config(void)
 {
 	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -127,8 +132,7 @@ void SystemClock_Config(void)
 
 	/** Initializes the CPU, AHB and APB buses clocks
 	 */
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-								|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
 	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
 	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
 	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
@@ -141,9 +145,9 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
 void Error_Handler(void)
 {
 	/* USER CODE BEGIN Error_Handler_Debug */
