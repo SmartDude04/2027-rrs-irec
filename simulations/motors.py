@@ -26,8 +26,8 @@ L2200G = SolidMotor(
 
 L1420R = SolidMotor(
     thrust_source="./data/AeroTech_L1420R.eng",
-    dry_mass=2.265,                             # True value (assuming I read the data sheet correctly)
-    dry_inertia=(0.08833, 0.08833, 0.00159),    # Calculated value (making broad assumptions)
+    dry_mass=2.027,                             # True value
+    dry_inertia=(0.08833, 0.08833, 0.00159),    # Same as L2200G, should be updated
     nozzle_radius=33/1000,
     grain_number=5,
     grain_density=1815,
@@ -38,7 +38,7 @@ L1420R = SolidMotor(
     grains_center_of_mass_position=0.3405,      # Estimated value (assume cetner of length)
     center_of_dry_mass_position=0.3405,         # Estimated value (not a great estimation though)
     nozzle_position=0,
-    burn_time=2.3,                              # True value
+    burn_time=3.2,                              # True value
     throat_radius=11/1000,
     coordinate_system_orientation="nozzle_to_combustion_chamber",
 )

@@ -3,37 +3,88 @@
 #include "tmp119.h"
 #include "I2C_DMA.h"
 #include "gpio.h"
+#include "ICM.h"
+#include "mpr.h"
 
 void SystemClock_Config();
 void Error_Handler();
+void gpio_init();
+
 
 I2C_HandleTypeDef hi2c1;
-struct tmp119 temp_sensor;
 
-int main() {
+
+
+struct ICM icm_sensor;
+MPR_Data mprSensor;
+
+int main() { 
     HAL_Init();
     SystemClock_Config();
     LED_Init();
     MX_USB_DEVICE_Init();
     I2C_Init(&hi2c1);
+	
+	gpio_init();
 
+	SerialWrite("Starting ICM-20948 test...\n");
+	HAL_Delay(2000);
+	ICM_init(&icm_sensor);
+	
     while (1) {
-        if (!temp_sensor.busy) {
-            TMP119_StartRead(&temp_sensor);
+        if (!icm_sensor.aBusy && !icm_sensor.gBusy) {
+			/* Only start one I2C DMA transfer at a time. */
+			ICM_StartAccel(&icm_sensor);
         }
-        if (temp_sensor.new_data) {
-            SerialWrite("Temp: %f\n", temp_sensor.temp);
-            temp_sensor.new_data = false;
+	
+        if (icm_sensor.new_accel_data) {
+			
+			SerialWrite("Accel X: %f Accel Y: %f Accel Z: %f\n",icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ);
+            icm_sensor.new_accel_data = false;
         }
+		if (icm_sensor.new_gyro_data) {
+			SerialWrite("Gyro X: %f  Gyro Y: %f  Gyro Z: %f\n",icm_sensor.gyroX, icm_sensor.gyroY, icm_sensor.gyroZ);
+			icm_sensor.new_gyro_data = false;
+		}
         HAL_Delay(500);
     }
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
     if (hi2c == &hi2c1) {
-        TMP119_GetTemperature(&temp_sensor);
-    }
+		if (icm_sensor.aBusy) {
+			ICM_GetAccel(&icm_sensor);
+			/* Queue the gyro read after the accel read releases the bus. */
+			if (!icm_sensor.aBusy && !icm_sensor.gBusy) {
+				ICM_StartGyro(&icm_sensor);
+			}
+		} else if (icm_sensor.gBusy) {
+			ICM_GetGyro(&icm_sensor,false);
+			if (!icm_sensor.gBusy && !icm_sensor.aBusy) {
+				ICM_StartAccel(&icm_sensor);
+			}
+		}
+	}
+			
+		
+		
+		
+        
+    
 }
+
+void gpio_init() {
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	GPIO_InitStruct.Pin = GPIO_PIN_13;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+}
+
+
 
 /**
   * @brief System Clock Configuration
