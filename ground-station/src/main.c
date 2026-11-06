@@ -3,13 +3,11 @@
 #include "gpio.h"
 #include "SPI.h"
 #include "lora_sx1276.h"
-#include "radio.h"
 
 void SystemClock_Config(void);
 void Error_Handler(void);
 
 lora_sx1276 lora;
-uint8_t buf[32];
 
 int main(void)
 {
@@ -25,8 +23,7 @@ int main(void)
 
 	while (1)
 	{
-		radio_test(&lora);
-		HAL_Delay(500);
+		
 	}
 	
 }

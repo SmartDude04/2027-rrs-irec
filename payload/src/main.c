@@ -25,10 +25,11 @@ int main() {
 	if (res != LORA_OK) {
 		SerialWrite("LORA Init Failed: %u", res);
 	}
-
+	lora_mode_receive_continuous(&lora);
     while (1) {
-        res = lora_version(&lora);
-		SerialWrite("Version: 0x%u\n", res);
+		if (res == 0) {
+        	radio_test(&lora);
+		}
     }
 }
 

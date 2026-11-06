@@ -5,6 +5,8 @@
 #include "stm32h7xx_hal_spi.h"
 #include "stm32h7xx_hal_dma.h"
 
-void spi_init();
+extern SPI_HandleTypeDef hspi1;
+
+void SPI_Init();
 
 #endif

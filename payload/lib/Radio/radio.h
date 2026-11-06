@@ -11,6 +11,11 @@ enum state {
     DESCENT
 };
 
+struct payload {
+    uint8_t device_ID;
+    uint16_t data;
+};
+
 void radio_config(lora_sx1276 *lora);
 void radio_test(lora_sx1276 *lora);
 
