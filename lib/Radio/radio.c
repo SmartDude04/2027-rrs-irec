@@ -13,6 +13,7 @@ uint8_t radio_command(struct radio_link *link, uint8_t destination, uint8_t comm
     }
     return COMM_OK;
 }
+
 uint8_t radio_request_data(struct radio_link *link, uint8_t destination) {
     if (!radio_link_send(link, destination, MSG_TELEMETRY, NULL, 0)) {
         return COMM_TX_FAILED;

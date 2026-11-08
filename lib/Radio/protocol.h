@@ -9,7 +9,7 @@
 
 
 /**
- * @brief Packet format
+ * @brief General Packet format
  */
 struct protocol_packet {
     uint8_t source;

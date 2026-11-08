@@ -56,8 +56,24 @@ struct radio_link {
     struct radio_link_stats stats;
 };
 
+
+/**
+ * @brief Initializes Lora
+ * @param lora - lora instance struct, must set all lora fields before initializing
+ * @param link - radio link instance
+ * @param node_id - ID number for node
+ */
 bool radio_link_init(lora_sx1276 *lora, struct radio_link *link, uint8_t node_id);
 
+
+/**
+ * @brief Sends a radio message
+ * @param link - link instance used
+ * @param destination - Who should be receiving the message
+ * @param message_type - Type of message to be sent
+ * @param data - byte array that will be sent
+ * @param data_length - length of data array
+*/
 bool radio_link_send(
     struct radio_link *link,
     uint8_t destination,
@@ -66,10 +82,22 @@ bool radio_link_send(
     uint16_t data_length
 );
 
+/**
+ * @brief Receives a message and adds it to the rx_queue
+ * @param link - radio link the message is added to to
+ */
 void radio_link_receive(struct radio_link *link);
 
+/**
+ * @brief Checks if there is a message in the queue
+ * @return True if message in queue, False if queue is empty
+ */
 bool radio_link_message_available(struct radio_link *link);
 
+/**
+ * @brief Saves first message in queue to packet and advances the queue
+ * @param packet - Packet where message will be saved
+ */
 bool radio_link_get_message(struct radio_link *link, struct protocol_packet *packet);
 
 #endif
