@@ -50,7 +50,6 @@
   */
 
 #include "stm32h7xx.h"
-#include "stm32h7xx_hal_tim.h"
 #include <math.h>
 
 #if !defined  (HSE_VALUE)
