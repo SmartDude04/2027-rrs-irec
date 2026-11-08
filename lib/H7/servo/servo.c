@@ -7,7 +7,7 @@ static void PWM_TIM3_Init(void);
 
 static TIM_HandleTypeDef tim3_handle;
 
-void Servo_Init_PA6(void)
+void Servo_Init_TIM3_PA6(void)
 {
     PWM_GPIO_Init_PA6();
     PWM_TIM3_Init();
