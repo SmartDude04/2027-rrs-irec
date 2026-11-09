@@ -94,3 +94,17 @@ void ICM_init(struct ICM *dev) {
 
     
 }
+void ICM_setLowPower(bool lowPower){
+
+    uint8_t pwr =  0x01 | (1 << 6); 
+    if(lowPower){
+    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000); // ensure on bank 0
+    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &pwr, 1, 1000);
+    }
+    if (!lowPower){
+        pwr = 0x01;  
+        HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000); // ensure on bank 0
+        HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &pwr, 1, 1000);
+        HAL_Delay(50);  
+    }
+}
