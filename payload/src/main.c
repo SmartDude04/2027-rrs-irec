@@ -16,7 +16,9 @@ struct ICM icm_sensor;
 MPR_Data mprSensor;
 struct tmp119 temp_sensor1;
 struct tmp119 temp_sensor2;
-
+float filteredAccel[3] = {-9999.0f, -9999.0f, -9999.0f};
+float filteredGyro[3] = {-9999.0f, -9999.0f, -9999.0f};
+float filteredTemp[2] = {-9999.0f, -9999.0f};
 enum STATE
 {
 	IDLE,
@@ -26,22 +28,26 @@ enum STATE
 	RECOVERY,
 	ERRORSTATE
 };
-const char* stateNames[] = {
-    "IDLE",
-    "ARMED",
-    "ASCENT",
-    "DESCENT",
-    "RECOVERY",
-    "ERRORSTATE"
-};
+const char *stateNames[] = {
+	"IDLE",
+	"ARMED",
+	"ASCENT",
+	"DESCENT",
+	"RECOVERY",
+	"ERRORSTATE"};
 enum STATE activeState;
 bool stateChangeComplete = false;
-double prevPressure =0;
-int startCounter =0;
+float prevPressure = -9999.0f;
 uint32_t launchStart = 0;
+int descentCounter = 0;
+int ascentCounter = 0;
+double minPressureSeen = 999.0;
+double maxPressureSeen = 0.0;
+void exponentialFilter(float input, float *previous, double alpha);
+double alpha = 0;
 int main()
 {
-	activeState = ASCENT;
+	activeState = ARMED;
 
 	HAL_Init();
 	SystemClock_Config();
@@ -51,8 +57,8 @@ int main()
 	gpio_init();
 	HAL_Delay(2000);
 	ICM_init(&icm_sensor);
-	TMP119_setAddr(&temp_sensor1,false);
-	TMP119_setAddr(&temp_sensor2,true);
+	TMP119_setAddr(&temp_sensor1, false);
+	TMP119_setAddr(&temp_sensor2, true);
 
 	while (1)
 	{
@@ -62,8 +68,8 @@ int main()
 		case IDLE:
 			if (!stateChangeComplete)
 			{
-				TMP119_SetLowPower(&temp_sensor1,true);
-				TMP119_SetLowPower(&temp_sensor2,true);
+				TMP119_SetLowPower(&temp_sensor1, true);
+				TMP119_SetLowPower(&temp_sensor2, true);
 				ICM_setLowPower(true);
 				// mpr is low power by default when not reading
 				stateChangeComplete = true;
@@ -73,17 +79,18 @@ int main()
 			// all but radio off
 			// if () TODO: PUT RADIO TRIGGER HERE
 			// {
-				// stateChangeComplete = false;
-				//activeState = ARMED;
+			// stateChangeComplete = false;
+			// activeState = ARMED;
 			//}
 			break;
 		case ARMED:
 			if (!stateChangeComplete)
 			{
+				alpha = .9;
 				ICM_setLowPower(false);
 				stateChangeComplete = true;
 			}
-			if (!icm_sensor.aBusy&&!mprSensor.busy)
+			if (!icm_sensor.aBusy && !mprSensor.busy)
 			{
 				HAL_StatusTypeDef ret = ICM_StartAccel(&icm_sensor);
 				if (ret != HAL_OK)
@@ -92,127 +99,186 @@ int main()
 				}
 				while (icm_sensor.aBusy)
 					;
-			
-			MPR_errors read_result = MPR_Read(&mprSensor);
-			while (mprSensor.busy)
+
+				MPR_errors read_result = MPR_Read(&mprSensor);
+				while (mprSensor.busy)
 					;
-			if (read_result != MPR_OK)
+				if (read_result != MPR_OK)
+				{
+					activeState = ERRORSTATE;
+				}
+				if (icm_sensor.new_accel_data)
+				{
+					exponentialFilter(icm_sensor.accelX, (&filteredAccel[0]), alpha);
+					exponentialFilter(icm_sensor.accelY, (&filteredAccel[1]), alpha);
+					exponentialFilter(icm_sensor.accelZ, (&filteredAccel[2]), alpha);
+					exponentialFilter(mprSensor.pressure, (&prevPressure), alpha);
+					SerialWrite("Accel, %f, Pressure, %.2f psi | asce:%d \n", icm_sensor.accelY, prevPressure, ascentCounter);
+					icm_sensor.new_accel_data = false;
+				}
+			}
+
+			// broken by barometer detecting large spike - "launch", switch to case ASCENT
+			// broken by sensor reading error  - something not recieving, radio com. failing, switch to case ERROR
+			// imu on, accellerometer on, TMP off, pressure low reading?
+			if (prevPressure > 14 && filteredAccel[2] < -.5)
 			{
-				activeState = ERRORSTATE;
+				if (prevPressure > maxPressureSeen)
+				{
+					maxPressureSeen = prevPressure;
+					ascentCounter = 0;
+				}
+				else if (prevPressure < maxPressureSeen - 0.005)
+				{
+					ascentCounter++;
+				}
+				else if (ascentCounter > 0)
+				{
+					ascentCounter--;
+				}
+
+				if (ascentCounter > 75)
+				{
+					stateChangeComplete = false;
+					activeState = ASCENT;
+				}
 			}
-			if(icm_sensor.new_accel_data){
-			SerialWrite("Accel, %f, Pressure, %.2f psi\n", icm_sensor.accelY, mprSensor.pressure);
-			icm_sensor.new_accel_data = false;
+			break;
+		case ASCENT:
+			if (!stateChangeComplete)
+			{
+				alpha = .9;
+				TMP119_SetLowPower(&temp_sensor1, false);
+				TMP119_SetLowPower(&temp_sensor2, false);
+				ICM_setLowPower(false);
+				stateChangeComplete = true;
 			}
-		
-		}
-		
-		// broken by accellerometer detecting large spike - "launch", switch to case ASCENT
-		// broken by sensor reading error  - something not recieving, radio com. failing, switch to case ERROR
-		// imu on, accellerometer on, TMP off, pressure low reading?
-		if (icm_sensor.accelY>10&&(abs(mprSensor.pressure-prevPressure))>10)// make sure this is right axis and change these numbers to be real
-		{
-			startCounter++;
-			if(startCounter>=5){ // this is my thought of making sure that we don't get like problematic readings/ 1 reading says launch 
-			stateChangeComplete = false;
-			activeState = ASCENT;
-			launchStart = HAL_GetTick();
-		}
-		prevPressure=mprSensor.pressure;
-		}
-		break;
-	case ASCENT:
-		if (!stateChangeComplete)
-		{
-			
-			TMP119_SetLowPower(&temp_sensor1,false);
-			TMP119_SetLowPower(&temp_sensor2,false);
-			ICM_setLowPower(false);
-			stateChangeComplete = true;
-		}
-		// make sure last loop is "done" before starting the next one
-		if (!icm_sensor.aBusy &&
-			!icm_sensor.gBusy &&
-			!temp_sensor1.busy&&!temp_sensor2.busy&&!mprSensor.busy)
-		{
-			// here is where you ensure that all the sensors are ready to be read from, and then you can start the next read cycle
-			ICM_StartAccel(&icm_sensor);
-			while (icm_sensor.aBusy)
-				;
-			ICM_StartGyro(&icm_sensor);
-			while (icm_sensor.gBusy)
-				;
-			TMP119_StartRead(&temp_sensor1);
-			while (temp_sensor1.busy)
-				;
+			// make sure last loop is "done" before starting the next one
+			if (!icm_sensor.aBusy &&
+				!icm_sensor.gBusy &&
+				!temp_sensor1.busy && !temp_sensor2.busy && !mprSensor.busy)
+			{
+				// here is where you ensure that all the sensors are ready to be read from, and then you can start the next read cycle
+				ICM_StartAccel(&icm_sensor);
+				while (icm_sensor.aBusy)
+					;
+				ICM_StartGyro(&icm_sensor);
+				while (icm_sensor.gBusy)
+					;
+				TMP119_StartRead(&temp_sensor1);
+				while (temp_sensor1.busy)
+					;
 				TMP119_StartRead(&temp_sensor2);
-			while (temp_sensor2.busy)
-				;
-			MPR_Read(&mprSensor);
-			while(mprSensor.busy)
-			;
+				while (temp_sensor2.busy)
+					;
+				MPR_Read(&mprSensor);
+				while (mprSensor.busy)
+					;
+			}
+			if (icm_sensor.new_accel_data &&
+				icm_sensor.new_gyro_data &&
+				temp_sensor1.new_data && temp_sensor2.new_data)
+			{
+				uint32_t elapsed = HAL_GetTick() - launchStart;
+				exponentialFilter(icm_sensor.accelX, (&filteredAccel[0]), alpha);
+				exponentialFilter(icm_sensor.accelY, (&filteredAccel[1]), alpha);
+				exponentialFilter(icm_sensor.accelZ, (&filteredAccel[2]), alpha);
+				exponentialFilter(icm_sensor.gyroX, (&filteredGyro[0]), alpha);
+				exponentialFilter(icm_sensor.gyroY, (&filteredGyro[1]), alpha);
+				exponentialFilter(icm_sensor.gyroZ, (&filteredGyro[2]), alpha);
+				exponentialFilter(temp_sensor1.temp, (&filteredTemp[0]), alpha);
+				exponentialFilter(temp_sensor2.temp, (&filteredTemp[1]), alpha);
+				exponentialFilter(mprSensor.pressure, (&prevPressure), alpha);
+				// this is where all the stuff is properly updated and should be referenced/called from
+				SerialWrite("t:%u, | ax:%.2f,ay:%.2f,az:%.2f,| gx:%.2f,gy:%.2f,gz:%.2f, | t1:%.2f,t2:%.2f, | p:%.4f, | desc:%d \n",
+							(unsigned long)elapsed,
+							filteredAccel[0], filteredAccel[1], filteredAccel[2],
+							filteredGyro[0], filteredGyro[1], filteredGyro[2],
+							filteredTemp[0], filteredTemp[1], prevPressure, descentCounter);
+
+				// 				SerialWrite("%lu,"
+				// "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,"   // ax, ay, az (raw, filt each)
+				// "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,"   // gx, gy, gz
+				// "%.2f,%.2f,%.2f,%.2f,"             // t1, t2
+				// "%.2f\n",                          // pressure
+				// (unsigned long)elapsed,
+				// icm_sensor.accelX, filteredAccel[0],
+				// icm_sensor.accelY, filteredAccel[1],
+				// icm_sensor.accelZ, filteredAccel[2],
+				// icm_sensor.gyroX,  filteredGyro[0],
+				// icm_sensor.gyroY,  filteredGyro[1],
+				// icm_sensor.gyroZ,  filteredGyro[2],
+				// temp_sensor1.temp, filteredTemp[0],
+				// temp_sensor2.temp, filteredTemp[1],
+				// mprSensor.pressure);
+				icm_sensor.new_accel_data = false;
+				icm_sensor.new_gyro_data = false;
+				temp_sensor1.new_data = false;
+				temp_sensor2.new_data = false;
+			}
+			// launch timer begins?
+			// broken by baro differntial being consistent - means  apogee hit, switch to case DESCENT
+			// all sensors on reading full
+			if (prevPressure < 10)
+			{ // update for realistic apogee height
+				if (prevPressure < minPressureSeen)
+				{
+					minPressureSeen = prevPressure;
+					descentCounter = 0;
+				}
+				else if (prevPressure > minPressureSeen + 0.003)
+				{ // ~7 m... lower if needed
+					descentCounter++;
+				}
+				else if (descentCounter > 0)
+				{
+					descentCounter--;
+				}
+
+				if (descentCounter > 75)
+				{
+					stateChangeComplete = false;
+					activeState = DESCENT;
+				}
+			}
+			break;
+		case DESCENT:
+			if (!stateChangeComplete)
+			{
+
+				stateChangeComplete = true;
+			}
+			// broken by velocity going to ~0, baro reading going to ~ starting alt. Switch to case RECOVERY
+			// if ()
+			//{
+			// stateChangeComplete = false;
+			// activeState = RECOVERY;
+			//}
+			SerialWrite("descent\n");
+			break;
+		case RECOVERY:
+			if (!stateChangeComplete)
+			{
+
+				stateChangeComplete = true;
+			}
+			// final state
+			// all but radio off/save
+
+			break;
+		case ERRORSTATE:
+			if (!stateChangeComplete)
+			{
+
+				stateChangeComplete = true;
+			}
+
+			break;
 		}
-		if (icm_sensor.new_accel_data &&
-			icm_sensor.new_gyro_data &&
-			temp_sensor1.new_data&&temp_sensor2.new_data)
-		{
-			uint32_t elapsed = HAL_GetTick() - launchStart;
-			// this is where all the stuff is properly updated and should be referenced/called from
-			SerialWrite("t:%u, | ax:%.2f,ay:%.2f,az:%.2f,| gx:%.2f,gy:%.2f,gz:%.2f, | t1:%.2f,t2:%.2f, | p:%.2f\n",
-            (unsigned long)elapsed,
-            icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ,
-            icm_sensor.gyroX, icm_sensor.gyroY, icm_sensor.gyroZ,
-            temp_sensor1.temp, temp_sensor2.temp, mprSensor.pressure);
-
-			icm_sensor.new_accel_data = false;
-			icm_sensor.new_gyro_data = false;
-			temp_sensor1.new_data = false;
-			temp_sensor2.new_data = false;
-		}
-		// launch timer begins?
-		// broken by velocity switching to negative for >10 readings, baro reading concurring - apogee hit, switch to case DESCENT
-		// all sensors on reading full
-		//if () // dependant on velocity 
-		//{
-			//stateChangeComplete = false;
-			//activeState = DESCENT;
-		//}
-		break;
-	case DESCENT:
-		if (!stateChangeComplete)
-		{
-
-			stateChangeComplete = true;
-		}
-		// broken by velocity going to ~0, baro reading going to ~ starting alt. Switch to case RECOVERY
-		//if ()
-		//{
-			stateChangeComplete = false;
-			activeState = RECOVERY;
-		//}
-		break;
-	case RECOVERY:
-		if (!stateChangeComplete)
-		{
-
-			stateChangeComplete = true;
-		}
-		// final state
-		// all but radio off/save
-
-		break;
-	case ERRORSTATE:
-		if (!stateChangeComplete)
-		{
-
-			stateChangeComplete = true;
-		}
-
-		break;
+		// SerialWrite("Current State: %s\n", stateNames[activeState]);
+		HAL_Delay(10);
 	}
-	//SerialWrite("Current State: %s\n", stateNames[activeState]);
-	HAL_Delay(10);
-}}
+}
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
@@ -308,4 +374,15 @@ void Error_Handler(void)
 	{
 	}
 	/* USER CODE END Error_Handler_Debug */
+}
+void exponentialFilter(float input, float(*previous), double alpha)
+{
+	if (*previous == -9999.0f)
+	{
+		*previous = input;
+		return;
+	}
+	float filtered = (*previous) + (1 - alpha) * (input - (*previous));
+	*previous = filtered;
+	return;
 }
