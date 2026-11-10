@@ -34,6 +34,7 @@ uint8_t radio_rx_process(struct radio_link *link) {
                 break;
             case MSG_HEARTBEAT_ACK:
                 // TODO: Record that node is still active
+                radio_flag = MSG_HEARTBEAT_ACK;
                 break;
             case MSG_COMMAND:
                 // TODO: Implement way to execute commands, maybe an external command queue that is called in the main loop
@@ -46,13 +47,18 @@ uint8_t radio_rx_process(struct radio_link *link) {
                 // Check which one it was and save to radio_status
                 break;
             case MSG_TELEMETRY:
+                radio_flag = MSG_TELEMETRY;
+                break;
+            case MSG_TELEMETRY_ACK:
                 // Regular sensor data
                 // Convert rx_packet.data to corresponding packet struct depending on source
                 if (rx_packet.source == NODE_AIRBRAKES) {
+                    radio_flag = MSG_TELEMETRY_ACK + NODE_AIRBRAKES;
                     // Save rx_packet.data to airbrake struct
                 }
                 else if (rx_packet.source == NODE_PAYLOAD)
                 {
+                    radio_flag = MSG_TELEMETRY_ACK + NODE_PAYLOAD;
                     // Save rx_packet.data to payload struct
                 }
                 break;

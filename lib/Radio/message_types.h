@@ -5,11 +5,17 @@
 #define NODE_AIRBRAKES      0x02
 #define NODE_PAYLOAD        0x03
 
+// MSG_xx is call and MSG_xx_ACK is response
 enum message_type {
+    // Call for Heartbeat
     MSG_HEARTBEAT       = 0x01,
+    // Responds with heartbeat
     MSG_HEARTBEAT_ACK   = 0x02,
 
+    // Calls for telemetry data
     MSG_TELEMETRY       = 0x03,
+    // Responds with telemetry data
+    MSG_TELEMETRY_ACK   = 0x04,
 
     MSG_COMMAND         = 0x10,
     MSG_COMMAND_ACK     = 0x11,
@@ -18,21 +24,7 @@ enum message_type {
     MSG_NACK            = 0x21
 };
 
-enum command_type {
-    CMD_REQUEST_STATUS = 0x01,
-    CMD_TEST_SENSOR    = 0x02,
-    CMD_TEST_FUNCTION  = 0x03,
-
-    CMD_START_LOGGING  = 0x10,
-    CMD_STOP_LOGGING   = 0x11
-};
-
-enum command_ack {
-    CMD_RECEIVED,
-    CMD_ACCEPTED,
-    CMD_COMPLETED,
-    CMD_REJECTED,
-    CMD_FAILED
-};
+// Can equal a message_type to tell other parts of the program what message has arrived
+uint8_t radio_flag;
 
 #endif
