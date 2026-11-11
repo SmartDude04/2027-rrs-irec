@@ -34,7 +34,7 @@ uint8_t radio_rx_process(struct radio_link *link) {
                 break;
             case MSG_HEARTBEAT_ACK:
                 // TODO: Record that node is still active
-                radio_flag = MSG_HEARTBEAT_ACK;
+                radio_flag = MSG_HEARTBEAT_ACK + rx_packet.source;
                 break;
             case MSG_COMMAND:
                 // TODO: Implement way to execute commands, maybe an external command queue that is called in the main loop
@@ -62,7 +62,6 @@ uint8_t radio_rx_process(struct radio_link *link) {
                     // Save rx_packet.data to payload struct
                 }
                 break;
-            
             default:
                 break;
         }
