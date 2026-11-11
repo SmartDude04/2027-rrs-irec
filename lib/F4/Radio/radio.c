@@ -8,7 +8,7 @@ uint8_t radio_checkin(struct radio_link *link, uint8_t destination) {
 }
 
 uint8_t radio_command(struct radio_link *link, uint8_t destination, uint8_t command) {
-    if (!radio_link_send(link, destination, MSG_COMMAND, command, 1)) {
+    if (!radio_link_send(link, destination, MSG_COMMAND, &command, 1)) {
         return COMM_TX_FAILED;
     }
     return COMM_OK;
@@ -42,7 +42,7 @@ uint8_t radio_rx_process(struct radio_link *link) {
                 radio_link_send(link, rx_packet.source, MSG_COMMAND_ACK, NULL, 0);
                 break;
             case MSG_COMMAND_ACK:
-                uint8_t command_status = rx_packet.data;
+                command_status = rx_packet.data;
                 // The data shold be of type command_ack
                 // Check which one it was and save to radio_status
                 break;
