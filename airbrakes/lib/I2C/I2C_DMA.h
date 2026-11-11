@@ -4,6 +4,7 @@
 #include "stm32h7xx_hal.h"
 
 extern I2C_HandleTypeDef i2c1_handle;
+extern I2C_HandleTypeDef i2c2_handle;
 
 /**
  * Initializes I2C with PB6 as SCA and PB7 as SCL

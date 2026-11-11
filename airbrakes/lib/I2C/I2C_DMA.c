@@ -1,117 +1,158 @@
 #include "I2C_DMA.h"
 
-static DMA_HandleTypeDef i2c_tx_dma_handle = {0};
-static DMA_HandleTypeDef i2c_rx_dma_handle = {0};
+static DMA_HandleTypeDef i2c1_tx_dma_handle = {0};
+static DMA_HandleTypeDef i2c1_rx_dma_handle = {0};
+static DMA_HandleTypeDef i2c2_tx_dma_handle = {0};
+static DMA_HandleTypeDef i2c2_rx_dma_handle = {0};
 
 I2C_HandleTypeDef i2c1_handle = {0};
+I2C_HandleTypeDef i2c2_handle = {0};
 
-void I2C1_DMA_Init()
+static void init_dma(DMA_HandleTypeDef *dma, DMA_Stream_TypeDef *stream, const uint32_t request, const uint32_t direction)
 {
-    i2c1_handle.Instance = I2C1;
-    i2c1_handle.Init.Timing = 0x00707CBB; // 400 KHz mode for I2C interface
-    
-    if (HAL_I2C_Init(&i2c1_handle) != HAL_OK)
-    {
-        while (1);
-    }
-    
-    // Configure analog and digital noise filters
-    if (HAL_I2CEx_ConfigAnalogFilter(&i2c1_handle, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
-    {
-        while (1);
-    }
-    
-    if (HAL_I2CEx_ConfigDigitalFilter(&i2c1_handle, 0) != HAL_OK)
+    dma->Instance = stream;
+    dma->Init.Request = request;
+    dma->Init.Direction = direction;
+    dma->Init.PeriphInc = DMA_PINC_DISABLE;
+    dma->Init.MemInc = DMA_MINC_ENABLE;
+    dma->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    dma->Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    dma->Init.Mode = DMA_NORMAL;
+    dma->Init.Priority = DMA_PRIORITY_LOW;
+    dma->Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+
+    if (HAL_DMA_Init(dma) != HAL_OK)
     {
         while (1);
     }
 }
 
-/**
- * Function must be implemented by the user per STM32H7xx HAL description
- */
-void HAL_I2C_MspInit(I2C_HandleTypeDef * hi2c)
+static void enable_irq(const IRQn_Type irq)
 {
-    if (hi2c == NULL || hi2c->Instance != I2C1)
+    HAL_NVIC_SetPriority(irq, 0, 0);
+    HAL_NVIC_EnableIRQ(irq);
+}
+
+static void init_i2c(I2C_HandleTypeDef *hi2c)
+{
+    // Retains the existing timing; actual speed depends on the I2C clock.
+    hi2c->Init.Timing = 0x00707CBB;
+    hi2c->Init.OwnAddress1 = 0;
+    hi2c->Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+    hi2c->Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+    hi2c->Init.OwnAddress2 = 0;
+    hi2c->Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+    hi2c->Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+    hi2c->Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+
+    if (HAL_I2C_Init(hi2c) != HAL_OK)
+    {
+        while (1);
+    }
+
+    if (HAL_I2CEx_ConfigAnalogFilter(hi2c, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+    {
+        while (1);
+    }
+
+    if (HAL_I2CEx_ConfigDigitalFilter(hi2c, 0) != HAL_OK)
+    {
+        while (1);
+    }
+}
+
+// Retain the existing name so callers do not need to change.
+void I2C1_DMA_Init(void)
+{
+    i2c1_handle.Instance = I2C1;
+    i2c2_handle.Instance = I2C2;
+
+    init_i2c(&i2c1_handle);
+    init_i2c(&i2c2_handle);
+}
+
+void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
+{
+    if (hi2c == NULL || (hi2c->Instance != I2C1 && hi2c->Instance != I2C2))
     {
         return;
     }
-    
+
     // Per alternate function table in the datasheet, the following pins are I2C1 interfaces (listed as SCL & SDA):
     // - PB6 & PB7
     // - PB8 & PB9
     // We will be using PB6 & PB7 for now
-    __HAL_RCC_I2C1_CLK_ENABLE();
+    // The following  pins are I2C2 interfaces (listed as SCL & SDA):
+    // - PB10 & PB11
+    // We will be using PB10 and PB11
+    
+    
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_DMA1_CLK_ENABLE();
-    
-    // Configure PB6 and PB7 for alternate function open drain
-    GPIO_InitTypeDef pb6_7_init = {0};
-    pb6_7_init.Pin = GPIO_PIN_6 | GPIO_PIN_7;
-    pb6_7_init.Mode = GPIO_MODE_AF_OD;
-    pb6_7_init.Pull = GPIO_NOPULL;
-    pb6_7_init.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    pb6_7_init.Alternate = GPIO_AF4_I2C1;
-    HAL_GPIO_Init(GPIOB, &pb6_7_init);
-    
-    // Enable NVIC for interrupt handling
-    HAL_NVIC_SetPriority(I2C1_EV_IRQn, 0, 0);
-    HAL_NVIC_SetPriority(I2C1_ER_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);
-    HAL_NVIC_EnableIRQ(I2C1_ER_IRQn);
-    
-    // Initialize DMA for this I2C bus
-    i2c_tx_dma_handle.Instance = DMA1_Stream1;
-    i2c_tx_dma_handle.Init.Request = DMA_REQUEST_I2C1_TX;
-    i2c_tx_dma_handle.Init.Direction = DMA_MEMORY_TO_PERIPH;
-    i2c_tx_dma_handle.Init.PeriphInc = DMA_PINC_DISABLE;
-    i2c_tx_dma_handle.Init.MemInc = DMA_MINC_ENABLE;
-    i2c_tx_dma_handle.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    i2c_tx_dma_handle.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    i2c_tx_dma_handle.Init.Mode = DMA_NORMAL;
-    i2c_tx_dma_handle.Init.Priority = DMA_PRIORITY_LOW;
-    i2c_tx_dma_handle.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
-    
-    if (HAL_DMA_Init(&i2c_tx_dma_handle) != HAL_OK)
+
+    GPIO_InitTypeDef gpio = {0};
+    gpio.Mode = GPIO_MODE_AF_OD;
+    gpio.Pull = GPIO_NOPULL;
+    gpio.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+
+    if (hi2c->Instance == I2C1)
     {
-        while (1);
+        __HAL_RCC_I2C1_CLK_ENABLE();
+
+        gpio.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+        gpio.Alternate = GPIO_AF4_I2C1;
+        HAL_GPIO_Init(GPIOB, &gpio);
+
+        init_dma(&i2c1_tx_dma_handle, DMA1_Stream1, DMA_REQUEST_I2C1_TX, DMA_MEMORY_TO_PERIPH);
+        init_dma(&i2c1_rx_dma_handle, DMA1_Stream0, DMA_REQUEST_I2C1_RX, DMA_PERIPH_TO_MEMORY);
+
+        __HAL_LINKDMA(hi2c, hdmatx, i2c1_tx_dma_handle);
+        __HAL_LINKDMA(hi2c, hdmarx, i2c1_rx_dma_handle);
+
+        enable_irq(I2C1_EV_IRQn);
+        enable_irq(I2C1_ER_IRQn);
+        enable_irq(DMA1_Stream0_IRQn);
+        enable_irq(DMA1_Stream1_IRQn);
     }
-    
-    __HAL_LINKDMA(hi2c, hdmatx, i2c_tx_dma_handle);
-    
-    i2c_rx_dma_handle.Instance = DMA1_Stream0;
-    i2c_rx_dma_handle.Init.Request = DMA_REQUEST_I2C1_RX;
-    i2c_rx_dma_handle.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    i2c_rx_dma_handle.Init.PeriphInc = DMA_PINC_DISABLE;
-    i2c_rx_dma_handle.Init.MemInc = DMA_MINC_ENABLE;
-    i2c_rx_dma_handle.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    i2c_rx_dma_handle.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    i2c_rx_dma_handle.Init.Mode = DMA_NORMAL;
-    i2c_rx_dma_handle.Init.Priority = DMA_PRIORITY_LOW;
-    i2c_rx_dma_handle.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
-    
-    if (HAL_DMA_Init(&i2c_rx_dma_handle) != HAL_OK)
+    else
     {
-        while (1);
+        __HAL_RCC_I2C2_CLK_ENABLE();
+
+        gpio.Pin = GPIO_PIN_10 | GPIO_PIN_11;
+        gpio.Alternate = GPIO_AF4_I2C2;
+        HAL_GPIO_Init(GPIOB, &gpio);
+
+        init_dma(&i2c2_tx_dma_handle, DMA1_Stream3, DMA_REQUEST_I2C2_TX, DMA_MEMORY_TO_PERIPH);
+        init_dma(&i2c2_rx_dma_handle, DMA1_Stream2, DMA_REQUEST_I2C2_RX, DMA_PERIPH_TO_MEMORY);
+
+        __HAL_LINKDMA(hi2c, hdmatx, i2c2_tx_dma_handle);
+        __HAL_LINKDMA(hi2c, hdmarx, i2c2_rx_dma_handle);
+
+        enable_irq(I2C2_EV_IRQn);
+        enable_irq(I2C2_ER_IRQn);
+        enable_irq(DMA1_Stream2_IRQn);
+        enable_irq(DMA1_Stream3_IRQn);
     }
-    
-    __HAL_LINKDMA(hi2c, hdmarx, i2c_rx_dma_handle);
-    
-    HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 0);
-    HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-    HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 }
 
-// Below are all the interrupts this I2C bus will use
 void DMA1_Stream0_IRQHandler(void)
 {
-    HAL_DMA_IRQHandler(&i2c_rx_dma_handle);
+    HAL_DMA_IRQHandler(&i2c1_rx_dma_handle);
 }
 
 void DMA1_Stream1_IRQHandler(void)
 {
-    HAL_DMA_IRQHandler(&i2c_tx_dma_handle);
+    HAL_DMA_IRQHandler(&i2c1_tx_dma_handle);
+}
+
+void DMA1_Stream2_IRQHandler(void)
+{
+    HAL_DMA_IRQHandler(&i2c2_rx_dma_handle);
+}
+
+void DMA1_Stream3_IRQHandler(void)
+{
+    HAL_DMA_IRQHandler(&i2c2_tx_dma_handle);
 }
 
 void I2C1_EV_IRQHandler(void)
@@ -122,4 +163,14 @@ void I2C1_EV_IRQHandler(void)
 void I2C1_ER_IRQHandler(void)
 {
     HAL_I2C_ER_IRQHandler(&i2c1_handle);
+}
+
+void I2C2_EV_IRQHandler(void)
+{
+    HAL_I2C_EV_IRQHandler(&i2c2_handle);
+}
+
+void I2C2_ER_IRQHandler(void)
+{
+    HAL_I2C_ER_IRQHandler(&i2c2_handle);
 }
