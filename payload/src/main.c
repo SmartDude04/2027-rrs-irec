@@ -8,6 +8,7 @@
 #include "sdio.h"
 #include "fatfs.h"
 #include "lora_sx1276.h"
+#include "radio.h"
 #include "SPI.h"
 void SystemClock_Config();
 void Error_Handler();
@@ -17,22 +18,23 @@ I2C_HandleTypeDef hi2c2;
 
 struct ICM icm_sensor;
 MPR_Data mprSensor;
-lora_sx1276 lora ={
-	.spi=&hspi1,
-	.nss_port=GPIOA,
-	.nss_pin=GPIO_PIN_2,
-	.rst_port = GPIOA,
-	.rst_pin = GPIO_PIN_1,
+lora_sx1276 lora = {
 	.frequency = 433000000,
+	.nss_pin = GPIO_PIN_2,
+	.nss_port = GPIOA,
+	.rst_pin = GPIO_PIN_1,
+	.rst_port = GPIOA,
+	.spi = &hspi1,
 	.bw = LORA_BANDWIDTH_125_KHZ,
 	.sf = LORA_DEFAULT_SF,
-	.tx_power = LORA_DEFAULT_TX_POWER,
+	.pa_mode = LORA_PA_OUTPUT_PA_BOOST,
 	.rx_base_addr = LORA_DEFAULT_RX_ADDR,
 	.tx_base_addr = LORA_DEFAULT_TX_ADDR,
-	.spi_timeout = LORA_DEFAULT_SPI_TIMEOUT,
+	.tx_power = LORA_DEFAULT_TX_POWER,
 	.rx_frequency_offset = 0,
+	.spi_timeout = LORA_DEFAULT_SPI_TIMEOUT
 };
-
+struct radio_link link;
 struct tmp119 temp_sensor1;
 struct tmp119 temp_sensor2;
 float filteredAccel[3] = {-9999.0f, -9999.0f, -9999.0f};
@@ -90,6 +92,9 @@ int main()
 	MX_USB_DEVICE_Init();
 	MX_SDIO_SD_Init();
 	MX_FATFS_Init();
+	HAL_Delay(2000);
+	radio_link_init(&lora,&link, NODE_PAYLOAD);
+	lora_mode_receive_continuous(&lora);
 	HAL_Delay(1000);
 	
 	ICM_init(&icm_sensor);
@@ -369,6 +374,8 @@ int main()
 
 			break;
 		}
+
+		radio_link_send(&link, NODE_GROUND_STATION, MSG_ACK, NULL, 0);
 		// SerialWrite("Current State: %s\n", stateNames[activeState]);
 		HAL_Delay(10);
 	}
