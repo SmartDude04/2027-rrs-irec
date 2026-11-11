@@ -192,8 +192,7 @@ float airbrake_mpc_step(ab_mpc_t *m, float h, float v, ab_info_t *info) {
     status = (int32_t)solver.info->status_val;
     iters  = (int32_t)solver.info->iter;
 
-    const int ok = (status == OSQP_SOLVED || status == OSQP_SOLVED_INACCURATE ||
-                    status == OSQP_MAX_ITER_REACHED);
+const int ok = (status == OSQP_SOLVED || status == OSQP_SOLVED_INACCURATE);
     int finite = 1;
     for (int i = 0; i < AB_N; i++) {
       if (!(solver.solution->x[i] == solver.solution->x[i])) finite = 0;   /* NaN check */
