@@ -7,14 +7,32 @@
 #include "mpr.h"
 #include "sdio.h"
 #include "fatfs.h"
+#include "lora_sx1276.h"
+#include "SPI.h"
 void SystemClock_Config();
 void Error_Handler();
 void gpio_init();
 
-I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c2;
 
 struct ICM icm_sensor;
 MPR_Data mprSensor;
+lora_sx1276 lora ={
+	.spi=&hspi1,
+	.nss_port=GPIOA,
+	.nss_pin=GPIO_PIN_2,
+	.rst_port = GPIOA,
+	.rst_pin = GPIO_PIN_1,
+	.frequency = 433000000,
+	.bw = LORA_BANDWIDTH_125_KHZ,
+	.sf = LORA_DEFAULT_SF,
+	.tx_power = LORA_DEFAULT_TX_POWER,
+	.rx_base_addr = LORA_DEFAULT_RX_ADDR,
+	.tx_base_addr = LORA_DEFAULT_TX_ADDR,
+	.spi_timeout = LORA_DEFAULT_SPI_TIMEOUT,
+	.rx_frequency_offset = 0,
+};
+
 struct tmp119 temp_sensor1;
 struct tmp119 temp_sensor2;
 float filteredAccel[3] = {-9999.0f, -9999.0f, -9999.0f};
@@ -66,14 +84,14 @@ int main()
 	HAL_Init();
 
 	SystemClock_Config();
-	LED_Init();
+	MX_GPIO_Init();
+	I2C_Init(&hi2c2);
+	SPI_Init();
 	MX_USB_DEVICE_Init();
 	MX_SDIO_SD_Init();
 	MX_FATFS_Init();
+	HAL_Delay(1000);
 	
-	I2C_Init(&hi2c1);
-	gpio_init();
-	HAL_Delay(2000);
 	ICM_init(&icm_sensor);
 	TMP119_setAddr(&temp_sensor1, false);
 	TMP119_setAddr(&temp_sensor2, true);
@@ -90,7 +108,7 @@ int main()
     }
 	for (int i = 0; i < 1000; i++) { snprintf(filename, sizeof(filename), "log%03d.txt", i); if (f_stat(filename, &fno) == FR_NO_FILE) break; }
 	FR_Status = f_open(&Fil, filename, FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
-	HAL_Delay(1000);
+	SerialWrite("SD card mounted and file %s opened for writing\n", filename);
 	while (1)
 	{
 
@@ -359,7 +377,7 @@ int main()
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-	if (hi2c != &hi2c1)
+	if (hi2c != &hi2c2)
 	{
 		return;
 	}

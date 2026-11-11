@@ -13,11 +13,13 @@ uint16_t gyroSensitivity = 131; // 250dps range by default, 500dps = 65.5, 1000d
  * @return HAL_StatusTypeDef Returns if the I2C read was successful or not. HAL_OK if successful, HAL_ERROR if not.
  */
 HAL_StatusTypeDef ICM_StartAccel(struct ICM *dev) {
-    HAL_StatusTypeDef ret = HAL_OK;
+    HAL_StatusTypeDef ret = HAL_BUSY;
     if (!dev->aBusy) {
-       ret = HAL_I2C_Mem_Read_DMA(&hi2c1, ICM_ADDR, ICM_accelXH,I2C_MEMADD_SIZE_8BIT, (uint8_t *)acc, 6);
-       
         dev->aBusy = true;
+        ret = HAL_I2C_Mem_Read_DMA(&hi2c2, ICM_ADDR, ICM_accelXH,I2C_MEMADD_SIZE_8BIT, (uint8_t *)acc, 6);
+        if (ret != HAL_OK) {
+            dev->aBusy = false;
+        }
     }
     return ret;
 }
@@ -28,11 +30,13 @@ HAL_StatusTypeDef ICM_StartAccel(struct ICM *dev) {
  * @return HAL_StatusTypeDef  Returns if the I2C read was successful or not. HAL_OK if successful, HAL_ERROR if not.
  */
 HAL_StatusTypeDef ICM_StartGyro(struct ICM *dev) {
-    HAL_StatusTypeDef ret = HAL_OK;
+    HAL_StatusTypeDef ret = HAL_BUSY;
     if (!dev->gBusy) {
-        ret = HAL_I2C_Mem_Read_DMA(&hi2c1, ICM_ADDR, ICM_gyroXH,I2C_MEMADD_SIZE_8BIT, (uint8_t *)gyro, 6);
-       
         dev->gBusy = true;
+        ret = HAL_I2C_Mem_Read_DMA(&hi2c2, ICM_ADDR, ICM_gyroXH,I2C_MEMADD_SIZE_8BIT, (uint8_t *)gyro, 6);
+        if (ret != HAL_OK) {
+            dev->gBusy = false;
+        }
     }
     return ret;
 }
@@ -82,15 +86,15 @@ void ICM_init(struct ICM *dev) {
     dev->gBusy = false;
     dev->new_accel_data = false;
     dev->new_gyro_data = false;
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000); // ensure on bank 0
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x80}, 1, 1000); // reset device before starting everything
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000); // ensure on bank 0
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x80}, 1, 1000); // reset device before starting everything
     HAL_Delay(150); // delay for reset to happen
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x01}, 1, 1000);
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, PWR_MGMT_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000);
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x20}, 1, 1000); // direct to bank 2 adr 0x20
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, ACCEL_CONFIG, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000);
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, GYRO_CONFIG, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000);
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000); // direct back to bank 0 
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x01}, 1, 1000);
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, PWR_MGMT_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000);
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x20}, 1, 1000); // direct to bank 2 adr 0x20
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, ACCEL_CONFIG, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000);
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, GYRO_CONFIG, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000);
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000); // direct back to bank 0 
 
     
 }
@@ -98,13 +102,13 @@ void ICM_setLowPower(bool lowPower){
 
     uint8_t pwr =  0x01 | (1 << 6); 
     if(lowPower){
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000); // ensure on bank 0
-    HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &pwr, 1, 1000);
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000); // ensure on bank 0
+    HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &pwr, 1, 1000);
     }
     if (!lowPower){
         pwr = 0x01;  
-        HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000); // ensure on bank 0
-        HAL_I2C_Mem_Write(&hi2c1, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &pwr, 1, 1000);
+        HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, ICM_BANK_CONFIG, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000); // ensure on bank 0
+        HAL_I2C_Mem_Write(&hi2c2, ICM_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &pwr, 1, 1000);
         HAL_Delay(50);  
     }
 }

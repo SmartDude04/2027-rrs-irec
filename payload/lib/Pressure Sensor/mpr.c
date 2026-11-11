@@ -4,17 +4,21 @@ MPR_errors MPR_Read(MPR_Data *result)
 {
     
     const uint8_t command[] = {0xAA, 0x00, 0x00}; //sends the command to start reading pressure
-    if (HAL_I2C_Master_Transmit(&hi2c1, MPR_I2C_ADDR, (uint8_t *)command, sizeof(command), MPR_TIMEOUT_MS) != HAL_OK) 
+    if (HAL_I2C_Master_Transmit(&hi2c2, MPR_I2C_ADDR, (uint8_t *)command, sizeof(command), MPR_TIMEOUT_MS) != HAL_OK) 
     {
         result->error = MPR_I2C_ERROR;
         return MPR_I2C_ERROR;
+
+
+
+
     }
 
     uint32_t start = HAL_GetTick(); //starting "time"
     uint8_t status = 0;
 
     do {
-        if (HAL_I2C_Master_Receive(&hi2c1, MPR_I2C_ADDR, &status, 1, MPR_TIMEOUT_MS) != HAL_OK) {
+        if (HAL_I2C_Master_Receive(&hi2c2, MPR_I2C_ADDR, &status, 1, MPR_TIMEOUT_MS) != HAL_OK) {
             return MPR_I2C_ERROR;
         }
 
@@ -42,7 +46,7 @@ MPR_errors MPR_Read(MPR_Data *result)
     }
 
     uint8_t bytes[4];
-    if (HAL_I2C_Master_Receive(&hi2c1, MPR_I2C_ADDR, bytes, 4,
+    if (HAL_I2C_Master_Receive(&hi2c2, MPR_I2C_ADDR, bytes, 4,
                                MPR_TIMEOUT_MS) != HAL_OK) {
         return MPR_I2C_ERROR;
     }

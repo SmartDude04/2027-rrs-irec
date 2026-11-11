@@ -20,6 +20,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "sdio.h"
 
+void Error_Handler(void);
+
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
@@ -45,14 +47,22 @@ void MX_SDIO_SD_Init(void)
   HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
 
   hsd.Instance = SDIO;
-  hsd.Init.ClockEdge = SDIO_CLOCK_EDGE_RISING;
-  hsd.Init.ClockBypass = SDIO_CLOCK_BYPASS_DISABLE;
-  hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
-  hsd.Init.BusWide = SDIO_BUS_WIDE_1B;
-  hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-  hsd.Init.ClockDiv = 118;
-  /* USER CODE BEGIN SDIO_Init 2 */
-  HAL_SD_Init(&hsd);
+hsd.Init.ClockEdge = SDIO_CLOCK_EDGE_RISING;
+hsd.Init.ClockBypass = SDIO_CLOCK_BYPASS_DISABLE;
+hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
+hsd.Init.BusWide = SDIO_BUS_WIDE_1B;
+hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
+hsd.Init.ClockDiv = 118;
+
+if (HAL_SD_Init(&hsd) != HAL_OK)
+{
+    Error_Handler();
+}
+
+if (HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_4B) != HAL_OK)
+{
+    Error_Handler();
+}
   /* USER CODE END SDIO_Init 2 */
 
 }
@@ -77,7 +87,7 @@ void HAL_SD_MspInit(SD_HandleTypeDef* sdHandle)
     PA8     ------> SDIO_D1
     PA9     ------> SDIO_D2
     PA10    ------> SDIO_DET
-    PB4     ------> SDIO_D0
+    PB7     ------> SDIO_D0
     PB5     ------> SDIO_D3
     */
 
@@ -95,7 +105,7 @@ void HAL_SD_MspInit(SD_HandleTypeDef* sdHandle)
     GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = GPIO_PIN_15|GPIO_PIN_4|GPIO_PIN_5;
+    GPIO_InitStruct.Pin = GPIO_PIN_15|GPIO_PIN_5|GPIO_PIN_7;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -118,9 +128,9 @@ void HAL_SD_MspInit(SD_HandleTypeDef* sdHandle)
     hdma_sdio_rx.Init.MemBurst = DMA_MBURST_INC4;
     hdma_sdio_rx.Init.PeriphBurst = DMA_PBURST_INC4;
     if (HAL_DMA_Init(&hdma_sdio_rx) != HAL_OK)
-    {
-      //Error_Handler();
-    }
+{
+    Error_Handler();
+}
 
     __HAL_LINKDMA(sdHandle,hdmarx,hdma_sdio_rx);
 
@@ -139,9 +149,9 @@ void HAL_SD_MspInit(SD_HandleTypeDef* sdHandle)
     hdma_sdio_tx.Init.MemBurst = DMA_MBURST_INC4;
     hdma_sdio_tx.Init.PeriphBurst = DMA_PBURST_INC4;
     if (HAL_DMA_Init(&hdma_sdio_tx) != HAL_OK)
-    {
-      //Error_Handler();
-    }
+{
+    Error_Handler();
+}
 
     __HAL_LINKDMA(sdHandle,hdmatx,hdma_sdio_tx);
 
@@ -170,12 +180,12 @@ void HAL_SD_MspDeInit(SD_HandleTypeDef* sdHandle)
     PB15    ------> SDIO_CK
     PA8     ------> SDIO_D1
     PA9     ------> SDIO_D2
-    PB4     ------> SDIO_D0
+    PB7     ------> SDIO_D0
     PB5     ------> SDIO_D3
     */
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_6|GPIO_PIN_8|GPIO_PIN_9);
 
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_15|GPIO_PIN_4|GPIO_PIN_5);
+    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_15|GPIO_PIN_5|GPIO_PIN_7);
 
     /* SDIO DMA DeInit */
     HAL_DMA_DeInit(sdHandle->hdmarx);
@@ -192,4 +202,3 @@ void HAL_SD_MspDeInit(SD_HandleTypeDef* sdHandle)
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
-
