@@ -11,7 +11,9 @@ void airbrake_start(void) {                 /* once, e.g. at burnout detect */
 }
 
 static volatile float last_alpha;
-void servo_set_opening(float a) { last_alpha = a; }   /* stub: replace with your PWM code */
+void servo_set_opening(float a) {
+    last_alpha = a;
+}   /* stub: replace with your PWM code */
 
 void airbrake_tick(float alt_m, float vz_mps) {   /* every AB_DT_MPC seconds */
     ab_info_t info;

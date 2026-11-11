@@ -35,10 +35,32 @@ ab_rocket_t ab_default_rocket(void) {
   return r;
 }
 
+static float lookup_cda(float alpha) {
+  // Total CdA [m^2] for alpha = 0.0, 0.1, ..., 1.0.
+  static const float cda[] = {
+    0.0082223f, 0.0083765f, 0.0087967f, 0.0092316f,
+    0.0097345f, 0.0102216f, 0.0106441f, 0.0110802f,
+    0.0117885f, 0.0126849f, 0.0135710f
+  };
+
+  const float opening = fminf(fmaxf(alpha, 0.0f), 1.0f);
+  const float position = opening * 10.0f;
+
+  if (position >= 10.0f) {
+    return cda[10];
+  }
+
+  const int lower = (int)position;
+  const float fraction = position - (float)lower;
+
+  return cda[lower] + fraction * (cda[lower + 1] - cda[lower]);
+}
+
 static float accel(const ab_rocket_t *r, float h, float v, float alpha,
                    uint32_t *evals) {
   float rho = AB_RHO0 * expf(-h / AB_H_SCALE);
-  float cda = r->cd_scale * (r->body_cd * r->body_area + r->ab_cd * r->ab_area * alpha);
+  // float cda = r->cd_scale * (r->body_cd * r->body_area + r->ab_cd * r->ab_area * alpha);
+  float cda = r->cd_scale * lookup_cda(alpha);
   float drag = 0.5f * rho * cda * v * fabsf(v) / r->mass;
   if (evals) (*evals)++;
   return -AB_G0 - drag;
