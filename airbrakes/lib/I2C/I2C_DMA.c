@@ -3,25 +3,25 @@
 static DMA_HandleTypeDef i2c_tx_dma_handle = {0};
 static DMA_HandleTypeDef i2c_rx_dma_handle = {0};
 
-I2C_HandleTypeDef i2c_handle = {0};
+I2C_HandleTypeDef i2c1_handle = {0};
 
 void I2C1_DMA_Init()
 {
-    i2c_handle.Instance = I2C1;
-    i2c_handle.Init.Timing = 0x00707CBB; // 400 KHz mode for I2C interface
+    i2c1_handle.Instance = I2C1;
+    i2c1_handle.Init.Timing = 0x00707CBB; // 400 KHz mode for I2C interface
     
-    if (HAL_I2C_Init(&i2c_handle) != HAL_OK)
+    if (HAL_I2C_Init(&i2c1_handle) != HAL_OK)
     {
         while (1);
     }
     
     // Configure analog and digital noise filters
-    if (HAL_I2CEx_ConfigAnalogFilter(&i2c_handle, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+    if (HAL_I2CEx_ConfigAnalogFilter(&i2c1_handle, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
     {
         while (1);
     }
     
-    if (HAL_I2CEx_ConfigDigitalFilter(&i2c_handle, 0) != HAL_OK)
+    if (HAL_I2CEx_ConfigDigitalFilter(&i2c1_handle, 0) != HAL_OK)
     {
         while (1);
     }
@@ -116,10 +116,10 @@ void DMA1_Stream1_IRQHandler(void)
 
 void I2C1_EV_IRQHandler(void)
 {
-    HAL_I2C_EV_IRQHandler(&i2c_handle);
+    HAL_I2C_EV_IRQHandler(&i2c1_handle);
 }
 
 void I2C1_ER_IRQHandler(void)
 {
-    HAL_I2C_ER_IRQHandler(&i2c_handle);
+    HAL_I2C_ER_IRQHandler(&i2c1_handle);
 }
