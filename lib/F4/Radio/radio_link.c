@@ -15,7 +15,7 @@ bool radio_link_init(lora_sx1276 *lora, struct radio_link *link, uint8_t node_id
     link->rx_queue.head = 0;
     link->rx_queue.tail = 0;
 
-    lora_mode_standby(lora);
+    lora_mode_receive_continuous(lora);
 
     return ret;
 }
@@ -58,16 +58,16 @@ bool radio_link_send(struct radio_link *link, uint8_t destination, uint8_t messa
         return false;
     }
     link->stats.tx_packets++;
-
+    lora_mode_receive_continuous(link->lora);
     return true;
 }
 
 void radio_link_receive(struct radio_link *link) {
+    lora_mode_receive_continuous(link->lora);
+
     if (!lora_is_packet_available(link->lora)){
         return;
     }
-
-    lora_mode_receive_single(link->lora);
 
     uint8_t buf[LORA_MAX_PACKET_SIZE];
     uint8_t err;
