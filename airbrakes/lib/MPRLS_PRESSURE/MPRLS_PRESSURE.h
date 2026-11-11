@@ -10,13 +10,13 @@
 
 typedef enum
 {
-    UNINITIALIZED,
-    IDLE, // No work is being done
-    TX_PENDING, // Between starting the I2C command to make a measurement and the callback signaling the I2C command is complete
-    MEASURING, // Between the I2C request for a measurement being sent and PB8 going high 
-    MEASURED, // Between PB8 going high and the I2C request being made
-    RX_PENDING, // Between the I2C request being made and the callback signaling it is complete
-    DATA_READY // I2C request is complete and data is in *mprls_pressure_rx_buffer
+    MPRLS_UNINITIALIZED,
+    MPRLS_IDLE, // No work is being done
+    MPRLS_TX_PENDING, // Between starting the I2C command to make a measurement and the callback signaling the I2C command is complete
+    MPRLS_MEASURING, // Between the I2C request for a measurement being sent and PB8 going high 
+    MPRLS_MEASURED, // Between PB8 going high and the I2C request being made
+    MPRLS_RX_PENDING, // Between the I2C request being made and the callback signaling it is complete
+    MPRLS_DATA_READY // I2C request is complete and data is in *mprls_pressure_rx_buffer
 } MPRLS_STATUS;
 
 extern MPRLS_STATUS mprls_status;

@@ -17,8 +17,6 @@ int main(void)
     I2C1_DMA_Init();
     mprls_init();
     
-    HAL_Delay(3000);
-    
     while (1)
     {
         run_mprls();
@@ -27,7 +25,7 @@ int main(void)
 
 void run_mprls()
 {
-    if (mprls_status == IDLE)
+    if (mprls_status == MPRLS_IDLE)
     {
         const HAL_StatusTypeDef ret = request_mprls_read();
         if (ret != HAL_OK)
@@ -37,7 +35,7 @@ void run_mprls()
             while (1);
         }
     }
-    if (mprls_status == MEASURED)
+    if (mprls_status == MPRLS_MEASURED)
     {
         const HAL_StatusTypeDef ret = start_mprls_dma_read();
         if (ret != HAL_OK)
@@ -47,11 +45,11 @@ void run_mprls()
             while (1);
         }
     }
-    if (mprls_status == DATA_READY)
+    if (mprls_status == MPRLS_DATA_READY)
     {
         const uint32_t pressure = (mprls_pressure_rx_buffer[1] << 16) + (mprls_pressure_rx_buffer[2] << 8) + mprls_pressure_rx_buffer[3];
         USB_CDC_PRINTF("Pressure: %d\n", pressure);
-        mprls_status = IDLE;
+        mprls_status = MPRLS_IDLE;
     }
 }
 
@@ -59,9 +57,9 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
     if (hi2c->Devaddress == MPRLS_PRESSURE_I2C_ADDRESS << 1)
     {
-        if (mprls_status == TX_PENDING)
+        if (mprls_status == MPRLS_TX_PENDING)
         {
-            mprls_status = MEASURING;
+            mprls_status = MPRLS_MEASURING;
         }
     }
 }
@@ -73,9 +71,9 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
     if (hi2c->Devaddress == MPRLS_PRESSURE_I2C_ADDRESS << 1)
     {
-        if (mprls_status == RX_PENDING)
+        if (mprls_status == MPRLS_RX_PENDING)
         {
-            mprls_status = DATA_READY;
+            mprls_status = MPRLS_DATA_READY;
         }
     }
 }
@@ -87,9 +85,9 @@ void HAL_GPIO_EXTI_Callback(const uint16_t GPIO_Pin)
 {
     if (GPIO_Pin == GPIO_PIN_8)
     {
-        if (mprls_status == MEASURING)
+        if (mprls_status == MPRLS_MEASURING)
         {
-            mprls_status = MEASURED;
+            mprls_status = MPRLS_MEASURED;
         }
     }
 }

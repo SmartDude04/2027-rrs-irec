@@ -6,7 +6,7 @@
 double mprls_pressure_hpa = -1.0;
 double mprls_altitude_meters = -1.0;
 uint8_t mprls_pressure_rx_buffer[4] = {0};
-MPRLS_STATUS mprls_status = UNINITIALIZED;
+MPRLS_STATUS mprls_status = MPRLS_UNINITIALIZED;
 
 extern I2C_HandleTypeDef i2c1_handle;
 
@@ -27,12 +27,12 @@ void mprls_init()
     HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     
-    mprls_status = IDLE;
+    mprls_status = MPRLS_IDLE;
 }
 
 HAL_StatusTypeDef request_mprls_read()
 {
-    if (mprls_status != IDLE)
+    if (mprls_status != MPRLS_IDLE)
     {
         return HAL_ERROR;
     }
@@ -42,14 +42,14 @@ HAL_StatusTypeDef request_mprls_read()
     const HAL_StatusTypeDef ret = HAL_I2C_Master_Transmit_DMA(&i2c1_handle, MPRLS_PRESSURE_I2C_ADDRESS << 1, measurement_command, sizeof(measurement_command));
     if (ret == HAL_OK)
     {
-        mprls_status = TX_PENDING;
+        mprls_status = MPRLS_TX_PENDING;
     }
     return ret;
 }
 
 HAL_StatusTypeDef start_mprls_dma_read()
 {
-    if (mprls_status != MEASURED)
+    if (mprls_status != MPRLS_MEASURED)
     {
         return HAL_ERROR;
     }
@@ -59,7 +59,7 @@ HAL_StatusTypeDef start_mprls_dma_read()
     const HAL_StatusTypeDef ret = HAL_I2C_Master_Receive_DMA(&i2c1_handle, MPRLS_PRESSURE_I2C_ADDRESS << 1, mprls_pressure_rx_buffer, 4);
     if (ret == HAL_OK)
     {
-        mprls_status = RX_PENDING;
+        mprls_status = MPRLS_RX_PENDING;
     }
     return ret;
 }
