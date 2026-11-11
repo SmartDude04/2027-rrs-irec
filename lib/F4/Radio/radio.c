@@ -21,7 +21,7 @@ uint8_t radio_request_data(struct radio_link *link, uint8_t destination) {
     return COMM_OK;
 }
 
-uint8_t radio_rx_process(struct radio_link *link) {
+void radio_rx_process(struct radio_link *link) {
     struct protocol_packet rx_packet = {0};
     while(radio_link_message_available(link)) { // Go through queue
         radio_link_get_message(link, &rx_packet); // Get first message off queue

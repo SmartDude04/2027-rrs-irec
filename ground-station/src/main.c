@@ -3,11 +3,28 @@
 #include "gpio.h"
 #include "SPI.h"
 #include "lora_sx1276.h"
+#include "radio.h"
 
 void SystemClock_Config(void);
 void Error_Handler(void);
 
-lora_sx1276 lora;
+lora_sx1276 lora = {
+	.frequency = 433000000,
+	.nss_pin = GPIO_PIN_4,
+	.nss_port = GPIOA,
+	.rst_pin = GPIO_PIN_3,
+	.rst_port = GPIOA,
+	.spi = &hspi1,
+	.bw = LORA_BANDWIDTH_125_KHZ,
+	.sf = LORA_DEFAULT_SF,
+	.pa_mode = LORA_PA_OUTPUT_PA_BOOST,
+	.rx_base_addr = LORA_DEFAULT_RX_ADDR,
+	.tx_base_addr = LORA_DEFAULT_TX_ADDR,
+	.tx_power = LORA_DEFAULT_TX_POWER,
+	.rx_frequency_offset = 0,
+	.spi_timeout = LORA_DEFAULT_SPI_TIMEOUT
+};
+struct radio_link link;
 
 int main(void)
 {
@@ -16,14 +33,25 @@ int main(void)
 	MX_USB_DEVICE_Init();
 	LED_Init();
 	SPI_Init();
-	uint8_t res = lora_init(&lora, &hspi1, GPIOA, GPIO_PIN_4, GPIOA, GPIO_PIN_3, 433000000);
+	HAL_Delay(5000);
+	bool res = radio_link_init(&lora, &link, NODE_GROUND_STATION);
+	// uint8_t res = lora_init(&lora, &hspi1, GPIOA, GPIO_PIN_4, GPIOA, GPIO_PIN_3, 433000000);
 	if (res != LORA_OK) {
-		SerialWrite("LORA Init Failed: %u", res);
+		SerialWrite("Radio Link Init Failed: %u", res);
 	}
-
+	else {
+		SerialWrite("Radio Link Init Success");
+	}
+	res = radio_checkin(&link, NODE_PAYLOAD);
+	if (res != COMM_OK) {
+		SerialWrite("Heartbeat send Failed: %u", res);
+	}
+	else {
+		SerialWrite("Heartbeat send Success");
+	}
 	while (1)
 	{
-		
+
 	}
 	
 }
