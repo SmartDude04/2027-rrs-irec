@@ -53,8 +53,8 @@ void airbrake_start(void)
 
 void servo_set_opening(float a)
 {
-    last_alpha = a;
-    /* Stub: replace with your PWM code. */
+    float angle = a * 70;           // Taken from dynamics, have 0-70 degrees to work with for deployment
+    Servo_Move_Degrees((int)angle);
 }
 
 void airbrake_tick(float alt_m, float vz_mps)
