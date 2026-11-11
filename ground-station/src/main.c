@@ -4,15 +4,16 @@
 #include "SPI.h"
 #include "lora_sx1276.h"
 #include "radio.h"
+#include <stdint.h>
 
 void SystemClock_Config(void);
 void Error_Handler(void);
 
 lora_sx1276 lora = {
 	.frequency = 433000000,
-	.nss_pin = GPIO_PIN_4,
+	.nss_pin = GPIO_PIN_2,
 	.nss_port = GPIOA,
-	.rst_pin = GPIO_PIN_3,
+	.rst_pin = GPIO_PIN_1,
 	.rst_port = GPIOA,
 	.spi = &hspi1,
 	.bw = LORA_BANDWIDTH_125_KHZ,
@@ -26,6 +27,16 @@ lora_sx1276 lora = {
 };
 struct radio_link link;
 
+struct protocol_packet packet = {
+	.source = NODE_GROUND_STATION,
+	.destination = NODE_PAYLOAD,
+	.message_type = MSG_HEARTBEAT,
+	.sequence = 0x1234,
+	.data_length = 1,
+	.data = {32}
+};
+uint8_t buf1[MAX_PACKET_LENGTH];
+
 int main(void)
 {
   	HAL_Init();
@@ -34,25 +45,12 @@ int main(void)
 	LED_Init();
 	SPI_Init();
 	HAL_Delay(5000);
-	bool res = radio_link_init(&lora, &link, NODE_GROUND_STATION);
-	// uint8_t res = lora_init(&lora, &hspi1, GPIOA, GPIO_PIN_4, GPIOA, GPIO_PIN_3, 433000000);
-	if (res != LORA_OK) {
-		SerialWrite("Radio Link Init Failed: %u", res);
-	}
-	else {
-		SerialWrite("Radio Link Init Success");
-	}
-	res = radio_checkin(&link, NODE_PAYLOAD);
-	if (res != COMM_OK) {
-		SerialWrite("Heartbeat send Failed: %u", res);
-	}
-	else {
-		SerialWrite("Heartbeat send Success");
-	}
+	uint8_t res = radio_link_init(&lora, &link, NODE_GROUND_STATION);
+
 	while (1)
 	{
-
 	}
+	
 	
 }
 

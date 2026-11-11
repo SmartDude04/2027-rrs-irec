@@ -17,7 +17,23 @@ void SDIO_SDCard_Test();
 // I2C_HandleTypeDef hi2c1;
 // struct tmp119 temp_sensor;
 
-// lora_sx1276 lora;
+lora_sx1276 lora = {
+	.frequency = 433000000,
+	.nss_pin = GPIO_PIN_2,
+	.nss_port = GPIOA,
+	.rst_pin = GPIO_PIN_1,
+	.rst_port = GPIOA,
+	.spi = &hspi1,
+	.bw = LORA_BANDWIDTH_125_KHZ,
+	.sf = LORA_DEFAULT_SF,
+	.pa_mode = LORA_PA_OUTPUT_PA_BOOST,
+	.rx_base_addr = LORA_DEFAULT_RX_ADDR,
+	.tx_base_addr = LORA_DEFAULT_TX_ADDR,
+	.tx_power = LORA_DEFAULT_TX_POWER,
+	.rx_frequency_offset = 0,
+	.spi_timeout = LORA_DEFAULT_SPI_TIMEOUT
+};
+struct radio_link link;
 
 int main() {
     HAL_Init();
@@ -26,10 +42,9 @@ int main() {
     MX_USB_DEVICE_Init();
 	MX_SDIO_SD_Init();
 	MX_FATFS_Init();
-	//SPI_Init();
-	//lora_init(&lora, &hspi1, GPIOA, GPIO_PIN_4, GPIOA, GPIO_PIN_3, 433000000);
+	SPI_Init();
+	radio_link_init(&lora, &link, NODE_PAYLOAD);
 	HAL_Delay(5000);
-	SDIO_SDCard_Test();
 
     while (1) {
 
