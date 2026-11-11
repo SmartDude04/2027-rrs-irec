@@ -64,10 +64,9 @@ HAL_StatusTypeDef start_mprls_dma_read()
     return ret;
 }
 
-double pressure_hpa_to_altitude_meters(const double ground_height_above_sea_level)
+double pressure_hpa_to_altitude_meters(const double pressure_hpa)
 {
-    // From this formula: https://en.wikipedia.org/wiki/Pressure_altitude
-    return 145366.45 * (1 - pow(ground_height_above_sea_level / 1013.25, 0.190284)) - LAUNCH_SITE_ALTITUDE_ABOVE_SEA_LEVEL;
+    return 0.3048 * 145366.45 * (1 - pow(pressure_hpa / 1013.25, 0.190284)) - LAUNCH_SITE_ALTITUDE_ABOVE_SEA_LEVEL;
 }
 
 void EXTI9_5_IRQHandler(void)
