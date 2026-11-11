@@ -5,6 +5,37 @@
 
 static ab_mpc_t mpc;
 
+enum RocketState {
+    WaitingForLaunch,
+    Armed,
+    Boost,
+    Coast,
+    Idle,
+    Failure,
+};
+
+enum RocketState state;
+
+/*
+Basic State Machine Logic
+
+Idle: Initial state on the pad
+    Everything starts here.
+
+Boost Phase: AIR BRAKES ARE NOT ACTIVE
+    Significant acceleration is detected for more than 2 seconds and velocity
+    has gone above 10 m/s
+
+Coast Phase: AIR BRAKES ARE NOW ACTIVE
+    Has been in the boost phase for 4 seconds, velo has gone below 130 m/s (426 ft/s)
+
+Idle: apogee detected
+    Acceleration has gone to 0 or have been in the coast phase for 13 seconds
+
+Failure mode: Something goes wrong and everything stops
+
+*/
+
 void airbrake_start(void) {                 /* once, e.g. at burnout detect */
     ab_rocket_t model = ab_default_rocket();
     airbrake_mpc_init(&mpc, &model, AB_TARGET_APOGEE_M);
@@ -24,6 +55,8 @@ void airbrake_tick(float alt_m, float vz_mps) {   /* every AB_DT_MPC seconds */
 int main(void) {
     SystemCoreClockUpdate();
     airbrake_start();
+
+    state = WaitingForLaunch;
 
     float h = 231.0f, v = 140.0f;          /* fake state, only to exercise the solver */
     while (1) {
