@@ -1,41 +1,104 @@
+#include "main.h"
 #include "stm32h7xx_hal.h"
+
+#include "usb_cdc.h"
+#include "servo.h"
+#include "I2C_DMA.h"
+#include "../lib/MPRLS_PRESSURE/MPRLS_PRESSURE.h"
+
+#include "airbrake_config.h"
+#include "airbrake_mpc.h"
+
 #include "usb_device.h"
 #include "usb_serial.h"
 #include "fatfs.h"
 #include "sdmmc.h"
 #include "spi.h"
-//#include "lora_sx1276.h"
-//#include "radio.h"
+// #include "lora_sx1276.h"
+// #include "radio.h"
 
+static ab_mpc_t mpc;
+// static lora_sx1276 lora;
+
+/*
+Basic State Machine Logic
+
+Idle: Initial state on the pad
+    Everything starts here.
+
+Boost Phase: AIR BRAKES ARE NOT ACTIVE
+    Significant acceleration is detected for more than 2 seconds and velocity
+    has gone above 10 m/s
+
+Coast Phase: AIR BRAKES ARE NOW ACTIVE
+    Has been in the boost phase for 4 seconds, velo has gone below 130 m/s (426 ft/s)
+
+Idle: apogee detected
+    Acceleration has gone to 0 or have been in the coast phase for 13 seconds
+
+Failure: Something goes wrong and everything stops
+*/
+
+enum RocketState {
+    WaitingForLaunch,
+    Armed,
+    Boost,
+    Coast,
+    Idle,
+    Failure,
+};
+
+enum RocketState state;
 
 void SystemClock_Config(void);
 void Error_Handler(void);
 void MPU_Config(void);
 void SDIO_SDCard_Test();
 
-//lora_sx1276 lora;
+void run_mprls(void);
+void airbrake_start(void);
+void servo_set_opening(float a);
+void airbrake_tick(float alt_m, float vz_mps);
 
-int main()
+
+int main(void)
 {
-    MPU_Config();
     HAL_Init();
     SystemClock_Config();
+    SystemCoreClockUpdate();
+
+    USB_CDC_INIT();
+    Servo_Init_TIM3_PA6();
+    I2C1_DMA_Init();
+    mprls_init();
+  
+    MPU_Config();
     MX_USB_DEVICE_Init();
     MX_SDMMC1_SD_Init();
     MX_FATFS_Init();
+  
     HAL_Delay(5000);
-	  SDIO_SDCard_Test();
-    //SPI_Init();
-    //lora_init(&lora, &hspi1, GPIOA, GPIO_PIN_4, GPIOA, GPIO_PIN_3, 433000000);
-		while (1)
-		{
-		}
+    HAL_Delay(3000);
+  
+    SDIO_SDCard_Test();
+
+    airbrake_start();
+    state = WaitingForLaunch;
+
+    /* Original test values; replace with measured altitude and velocity. */
+    float h = 231.0f;
+    float v = 140.0f;
+
+    while (1)
+    {
+        run_mprls();
+
+        /* Call every AB_DT_MPC seconds once timing is implemented. */
+        airbrake_tick(h, v);
+    }
 }
 
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -92,9 +155,18 @@ void SystemClock_Config(void)
   }
 }
 
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
 
  /* MPU Configuration */
-
 void MPU_Config(void)
 {
   MPU_Region_InitTypeDef MPU_InitStruct = {0};
@@ -119,22 +191,6 @@ void MPU_Config(void)
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
   /* Enables the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
-
-}
-
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
 }
 
 void SDIO_SDCard_Test(void)
@@ -246,4 +302,73 @@ void SDIO_SDCard_Test(void)
   } else{
       SerialWrite("\r\nSD Card Un-mounted Successfully! \r\n");
   }
+}
+
+
+
+void run_mprls(void)
+{
+    if (mprls_status == IDLE)
+    {
+        const HAL_StatusTypeDef ret = request_mprls_read();
+
+        if (ret != HAL_OK)
+        {
+            HAL_Delay(10);
+            USB_CDC_PRINTF(
+                "request_mprls_read() failed with code %d", ret
+            );
+            while (1);
+        }
+    }
+
+    if (mprls_status == MEASURED)
+    {
+        const HAL_StatusTypeDef ret = start_mprls_dma_read();
+
+        if (ret != HAL_OK)
+        {
+            HAL_Delay(10);
+            USB_CDC_PRINTF(
+                "start_mprls_dma_read() failed with code %d", ret
+            );
+            while (1);
+        }
+    }
+
+    if (mprls_status == DATA_READY)
+    {
+        const uint32_t pressure =
+            ((uint32_t)mprls_pressure_rx_buffer[1] << 16)
+            | ((uint32_t)mprls_pressure_rx_buffer[2] << 8)
+            | (uint32_t)mprls_pressure_rx_buffer[3];
+
+        USB_CDC_PRINTF("Pressure: %lu\n", (unsigned long)pressure);
+
+        /*
+         * TODO: Convert raw pressure to altitude and estimate
+         * vertical velocity, then pass those to airbrake_tick().
+         */
+
+        mprls_status = IDLE;
+    }
+}
+
+void airbrake_start(void)
+{
+    ab_rocket_t model = ab_default_rocket();
+    airbrake_mpc_init(&mpc, &model, AB_TARGET_APOGEE_M);
+}
+
+void servo_set_opening(float a)
+{
+    float angle = a * 70;           // Taken from dynamics, have 0-70 degrees to work with for deployment
+    Servo_Move_Degrees((int)angle);
+}
+
+void airbrake_tick(float alt_m, float vz_mps)
+{
+    ab_info_t info;
+    float alpha = airbrake_mpc_step(&mpc, alt_m, vz_mps, &info);
+    servo_set_opening(alpha);
 }
