@@ -4,9 +4,12 @@ static DMA_HandleTypeDef i2c1_tx_dma_handle = {0};
 static DMA_HandleTypeDef i2c1_rx_dma_handle = {0};
 static DMA_HandleTypeDef i2c2_tx_dma_handle = {0};
 static DMA_HandleTypeDef i2c2_rx_dma_handle = {0};
+static DMA_HandleTypeDef i2c3_tx_dma_handle = {0};
+static DMA_HandleTypeDef i2c3_rx_dma_handle = {0};
 
 I2C_HandleTypeDef i2c1_handle = {0};
 I2C_HandleTypeDef i2c2_handle = {0};
+I2C_HandleTypeDef i2c3_handle = {0};
 
 static void init_dma(DMA_HandleTypeDef *dma, DMA_Stream_TypeDef *stream, const uint32_t request, const uint32_t direction)
 {
@@ -61,19 +64,20 @@ static void init_i2c(I2C_HandleTypeDef *hi2c)
     }
 }
 
-// Retain the existing name so callers do not need to change.
-void I2C1_DMA_Init(void)
+void I2C_DMA_Init(void)
 {
     i2c1_handle.Instance = I2C1;
     i2c2_handle.Instance = I2C2;
+    i2c3_handle.Instance = I2C3;
 
     init_i2c(&i2c1_handle);
     init_i2c(&i2c2_handle);
+    init_i2c(&i2c3_handle);
 }
 
 void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
 {
-    if (hi2c == NULL || (hi2c->Instance != I2C1 && hi2c->Instance != I2C2))
+    if (hi2c == NULL || (hi2c->Instance != I2C1 && hi2c->Instance != I2C2 && hi2c->Instance != I2C3))
     {
         return;
     }
@@ -84,10 +88,14 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
     // We will be using PB6 & PB7 for now
     // The following  pins are I2C2 interfaces (listed as SCL & SDA):
     // - PB10 & PB11
-    // We will be using PB10 and PB11
+    // // The following  pins are I2C3 interfaces (listed as SCL & SDA):
+    // - PA8 & PC9
+    // We will be using PA8 and PC9
     
     
+    __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_DMA1_CLK_ENABLE();
 
     GPIO_InitTypeDef gpio = {0};
@@ -114,7 +122,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
         enable_irq(DMA1_Stream0_IRQn);
         enable_irq(DMA1_Stream1_IRQn);
     }
-    else
+    else if (hi2c->Instance == I2C2)
     {
         __HAL_RCC_I2C2_CLK_ENABLE();
 
@@ -132,6 +140,28 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
         enable_irq(I2C2_ER_IRQn);
         enable_irq(DMA1_Stream2_IRQn);
         enable_irq(DMA1_Stream3_IRQn);
+    }
+    else if (hi2c->Instance == I2C3)
+    {
+        __HAL_RCC_I2C3_CLK_ENABLE();
+        
+        gpio.Pin = GPIO_PIN_8;
+        gpio.Alternate = GPIO_AF4_I2C3;
+        HAL_GPIO_Init(GPIOA, &gpio);
+        
+        gpio.Pin = GPIO_PIN_9;
+        HAL_GPIO_Init(GPIOC, &gpio);
+
+        init_dma(&i2c3_tx_dma_handle, DMA1_Stream5, DMA_REQUEST_I2C3_TX, DMA_MEMORY_TO_PERIPH);
+        init_dma(&i2c3_rx_dma_handle, DMA1_Stream4, DMA_REQUEST_I2C3_RX, DMA_PERIPH_TO_MEMORY);
+
+        __HAL_LINKDMA(hi2c, hdmatx, i2c3_tx_dma_handle);
+        __HAL_LINKDMA(hi2c, hdmarx, i2c3_rx_dma_handle);
+
+        enable_irq(I2C3_EV_IRQn);
+        enable_irq(I2C3_ER_IRQn);
+        enable_irq(DMA1_Stream4_IRQn);
+        enable_irq(DMA1_Stream5_IRQn);
     }
 }
 
@@ -155,6 +185,16 @@ void DMA1_Stream3_IRQHandler(void)
     HAL_DMA_IRQHandler(&i2c2_tx_dma_handle);
 }
 
+void DMA1_Stream4_IRQHandler(void)
+{
+    HAL_DMA_IRQHandler(&i2c3_rx_dma_handle);
+}
+
+void DMA1_Stream5_IRQHandler(void)
+{
+    HAL_DMA_IRQHandler(&i2c3_tx_dma_handle);
+}
+
 void I2C1_EV_IRQHandler(void)
 {
     HAL_I2C_EV_IRQHandler(&i2c1_handle);
@@ -173,4 +213,14 @@ void I2C2_EV_IRQHandler(void)
 void I2C2_ER_IRQHandler(void)
 {
     HAL_I2C_ER_IRQHandler(&i2c2_handle);
+}
+
+void I2C3_EV_IRQHandler(void)
+{
+    HAL_I2C_EV_IRQHandler(&i2c3_handle);
+}
+
+void I2C3_ER_IRQHandler(void)
+{
+    HAL_I2C_ER_IRQHandler(&i2c3_handle);
 }
