@@ -18,6 +18,16 @@ typedef enum
 } IMU_STATUS;
 extern IMU_STATUS imu_status;
 
+typedef struct
+{
+    double acceleration_x_meters_per_second_squared;
+    double acceleration_y_meters_per_second_squared;
+    double acceleration_z_meters_per_second_squared;
+    double gyro_x_degrees_per_second;
+    double gyro_y_degrees_per_second;
+    double gyro_z_degrees_per_second;
+} IMU_Data;
+
 
 /**
  * Initializes the ICM 20948 IMU on I2C2 with SCL & SDA on PB10 & PB11. Polling rate of 1.125 KHz
@@ -31,6 +41,12 @@ HAL_StatusTypeDef imu_init();
  * @return Status of the read. Does not guarantee the IMU received the request, just that the read is starting
  */
 HAL_StatusTypeDef read_acceleration_gyro();
+
+/**
+ * Using data in icm_20948_rx_buffer, converts raw data to acceleration and gyroscope data
+ * @return An IMU_Data struct containing acceleration and gyroscope data
+ */
+IMU_Data imu_data_from_rx_buffer();
 
 
 #endif

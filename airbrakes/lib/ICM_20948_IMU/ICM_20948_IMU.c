@@ -78,3 +78,26 @@ HAL_StatusTypeDef read_acceleration_gyro()
     }
     return ret;
 }
+
+IMU_Data imu_data_from_rx_buffer()
+{
+    IMU_Data data;
+    
+    const int16_t raw_accel_x = (int16_t)(((uint16_t) icm_20948_rx_buffer[0] << 8) + icm_20948_rx_buffer[1]);
+    const int16_t raw_accel_y = (int16_t)(((uint16_t) icm_20948_rx_buffer[2] << 8) + icm_20948_rx_buffer[3]);
+    const int16_t raw_accel_z = (int16_t)(((uint16_t) icm_20948_rx_buffer[4] << 8) + icm_20948_rx_buffer[5]);
+    const int16_t raw_gyro_x = (int16_t)(((uint16_t) icm_20948_rx_buffer[6] << 8) + icm_20948_rx_buffer[7]);
+    const int16_t raw_gyro_y = (int16_t)(((uint16_t) icm_20948_rx_buffer[8] << 8) + icm_20948_rx_buffer[9]);
+    const int16_t raw_gyro_z = (int16_t)(((uint16_t) icm_20948_rx_buffer[10] << 8) + icm_20948_rx_buffer[11]);
+    
+    // Raw is converted using conversion from sections 3.1 and 3.2
+    // https://cdn.sparkfun.com/assets/7/f/e/c/d/DS-000189-ICM-20948-v1.3.pdf
+    data.acceleration_x_meters_per_second_squared = 9.80665 * ((double) raw_accel_x) / 4096.0;
+    data.acceleration_y_meters_per_second_squared = 9.80665 * ((double) raw_accel_y) / 4096.0;
+    data.acceleration_z_meters_per_second_squared = 9.80665 * ((double) raw_accel_z) / 4096.0;
+    data.gyro_x_degrees_per_second = ((double) raw_gyro_x) / 32.8;
+    data.gyro_y_degrees_per_second = ((double) raw_gyro_y) / 32.8;
+    data.gyro_z_degrees_per_second = ((double) raw_gyro_z) / 32.8;
+    
+    return data;
+}
