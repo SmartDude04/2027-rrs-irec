@@ -35,6 +35,11 @@ int main(void)
     
     while (1)
     {
+        // Servo_Move_Degrees(0);
+        // HAL_Delay(1000);
+        // Servo_Move_Degrees(70);
+        // HAL_Delay(1000);
+        // continue;
         run_mprls();
         run_imu();
         
@@ -107,7 +112,6 @@ void run_imu()
     {
         imu_data = imu_data_from_rx_buffer();
         new_imu = 1;
-        imu_status = IMU_IDLE;
     }
 }
 
@@ -163,6 +167,20 @@ void HAL_GPIO_EXTI_Callback(const uint16_t GPIO_Pin)
         if (mprls_status == MPRLS_MEASURING)
         {
             mprls_status = MPRLS_MEASURED;
+        }
+    }
+}
+
+/**
+ * Called when a timer interrupt is set to fire
+ */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM4)
+    {
+        if (imu_status == IMU_DATA_READY)
+        {
+            imu_status = IMU_IDLE;
         }
     }
 }

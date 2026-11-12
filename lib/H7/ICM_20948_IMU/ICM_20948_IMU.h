@@ -31,6 +31,7 @@ typedef struct
 
 /**
  * Initializes the ICM 20948 IMU on I2C2 with SCL & SDA on PB10 & PB11. Polling rate of 1.125 KHz
+ * Also initializes TIM_4 to interrupt at 100 Hz
  *
  * @return Status of initialization
  */

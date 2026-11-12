@@ -13,6 +13,9 @@
 uint8_t icm_20948_rx_buffer[12] = {0};
 IMU_STATUS imu_status = IMU_UNINITIALIZED;
 
+static TIM_HandleTypeDef tim4_handle;
+HAL_StatusTypeDef tim4_init();
+
 HAL_StatusTypeDef imu_init()
 {
     if (imu_status != IMU_UNINITIALIZED)
@@ -55,13 +58,40 @@ HAL_StatusTypeDef imu_init()
     
     // Switch back to bank 0
     status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, REG_BANK_SEL, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000);
+    if (status != HAL_OK) { return status; }
     
+    status = tim4_init();
     if (status == HAL_OK)
     {
         imu_status = IMU_IDLE;
     }
     
     return status;
+}
+
+HAL_StatusTypeDef tim4_init()
+{
+    __HAL_RCC_TIM4_CLK_ENABLE();
+    
+    tim4_handle.Instance = TIM4;
+    tim4_handle.Init.Prescaler = 63; // Sets the timer to have a realized frequency of 1 MHz
+    tim4_handle.Init.CounterMode = TIM_COUNTERMODE_UP;
+    tim4_handle.Init.Period = 9999;
+    tim4_handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    tim4_handle.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+    
+    const HAL_StatusTypeDef status = HAL_TIM_Base_Init(&tim4_handle);
+    if (status != HAL_OK)
+    {
+        return status;
+    }
+    
+    HAL_NVIC_SetPriority(TIM4_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(TIM4_IRQn);
+    
+    // Initialization can leave an update flag pending
+    __HAL_TIM_CLEAR_FLAG(&tim4_handle, TIM_FLAG_UPDATE);
+    return HAL_TIM_Base_Start_IT(&tim4_handle);
 }
 
 HAL_StatusTypeDef read_acceleration_gyro()
@@ -96,4 +126,9 @@ IMU_Data imu_data_from_rx_buffer()
     data.gyro_z_degrees_per_second = ((double) raw_gyro_z) / 32.8;
     
     return data;
+}
+
+void TIM4_IRQHandler(void)
+{
+    HAL_TIM_IRQHandler(&tim4_handle);
 }
