@@ -20,18 +20,15 @@ HAL_StatusTypeDef imu_init()
         return HAL_ERROR;
     }
     
-    USB_CDC_PRINTF("Here 1\n");
     HAL_StatusTypeDef status;
     
     // Switch to bank 0
     status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, REG_BANK_SEL, I2C_MEMADD_SIZE_8BIT,(uint8_t[]){0x00}, 1, 1000);
     if (status != HAL_OK) { return status; }
-    USB_CDC_PRINTF("Here 2\n");
     
     // Reset the internal registers
     status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b10000000}, 1, 1000);
     if (status != HAL_OK) { return status; }
-    USB_CDC_PRINTF("Here 3\n");
     
     // Delay for reset to happen
     HAL_Delay(150);
@@ -39,7 +36,6 @@ HAL_StatusTypeDef imu_init()
     // Auto select the best available clock source 
     status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x01}, 1, 1000);
     if (status != HAL_OK) { return status; }
-    USB_CDC_PRINTF("Here 4\n");
     
     // Ensure gyro and accelerometer are enabled
     status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, PWR_MGMT_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0x00}, 1, 1000);
