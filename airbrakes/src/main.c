@@ -5,12 +5,15 @@
 #include "usb_cdc.h"
 #include "servo.h"
 #include "I2C_DMA.h"
-#include "ICM_20948_IMU.h"
-#include "MPRLS_PRESSURE.h"
+#include "../lib/ICM_20948_IMU/ICM_20948_IMU.h"
+#include "../lib/MPRLS_PRESSURE/MPRLS_PRESSURE.h"
 
 static void run_mprls();
 static void run_imu();
 
+static volatile uint8_t new_pressure = 0;
+static volatile uint8_t new_imu = 0;
+static volatile double pressure_hpa;
 static volatile double altitude_m;
 static volatile IMU_Data imu_data;
 
@@ -28,6 +31,23 @@ int main(void)
     {
         run_mprls();
         run_imu();
+        
+        if (new_pressure)
+        {
+            USB_CDC_PRINTF("Pressure (hPa): %lf\tAltitude (m): %lf\n", pressure_hpa, altitude_m);
+            new_pressure = 0;
+        }
+        if (new_imu)
+        {
+            USB_CDC_PRINTF("ax: %lf ay: %lf ax: %lf gx %lf gy %lf gz %lf\n",
+                imu_data.acceleration_x_meters_per_second_squared,
+                imu_data.acceleration_y_meters_per_second_squared,
+                imu_data.acceleration_z_meters_per_second_squared,
+                imu_data.gyro_x_degrees_per_second,
+                imu_data.gyro_y_degrees_per_second,
+                imu_data.gyro_z_degrees_per_second);
+            new_imu = 0;
+        }
         
         HAL_Delay(1);
     }
@@ -57,7 +77,9 @@ void run_mprls()
     }
     if (mprls_status == MPRLS_DATA_READY)
     {
-        altitude_m = pressure_hpa_to_altitude_meters(pressure_psi_to_hpa(pressure_psi_from_rx_buffer()));
+        pressure_hpa = pressure_psi_to_hpa(pressure_psi_from_rx_buffer());
+        altitude_m = pressure_hpa_to_altitude_meters(pressure_hpa);
+        new_pressure = 1;
         mprls_status = MPRLS_IDLE;
     }
 }
@@ -76,6 +98,7 @@ void run_imu()
     if (imu_status == IMU_DATA_READY)
     {
         imu_data = imu_data_from_rx_buffer();
+        new_imu = 1;
         imu_status = IMU_IDLE;
     }
 }
