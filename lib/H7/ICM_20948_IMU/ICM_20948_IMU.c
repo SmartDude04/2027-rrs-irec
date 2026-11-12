@@ -76,7 +76,7 @@ HAL_StatusTypeDef tim4_init()
     tim4_handle.Instance = TIM4;
     tim4_handle.Init.Prescaler = 63; // Sets the timer to have a realized frequency of 1 MHz
     tim4_handle.Init.CounterMode = TIM_COUNTERMODE_UP;
-    tim4_handle.Init.Period = 9999;
+    tim4_handle.Init.Period = 4999; // 200 Hz
     tim4_handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     tim4_handle.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     
