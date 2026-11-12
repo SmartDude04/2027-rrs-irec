@@ -49,6 +49,17 @@ HAL_StatusTypeDef request_mprls_read();
 HAL_StatusTypeDef start_mprls_dma_read();
 
 /**
+ * Using data in mprls_pressure_rx_buffer, returns the pressure in PSI
+ * @return The pressure, in PSI
+ */
+double pressure_psi_from_rx_buffer();
+
+/**
+ * Converts the pressure in PSI to hPa
+ */
+double pressure_psi_to_hpa(double pressure_psi);
+
+/**
  * Converts a pressure reading to a relative altitude above the ground
  * 
  * @param ground_height_above_sea_level Height, in meters, of the launch site above sea level

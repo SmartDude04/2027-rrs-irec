@@ -64,6 +64,23 @@ HAL_StatusTypeDef start_mprls_dma_read()
     return ret;
 }
 
+double pressure_psi_from_rx_buffer()
+{
+    const double output_min = 0x19999Au;
+    const double output_max = 0xE66666u;
+    const double pressure_min = 0.0f;
+    const double pressure_max = 25.0f;
+    
+    const uint32_t pressure_raw = (mprls_pressure_rx_buffer[1] << 16) + (mprls_pressure_rx_buffer[2] << 8) + mprls_pressure_rx_buffer[3];
+    
+    return (pressure_raw - output_min) / (output_max - output_min) * (pressure_max - pressure_min) + pressure_min;
+}
+
+double pressure_psi_to_hpa(const double pressure_psi)
+{
+    return pressure_psi * 68.9476;
+}
+
 double pressure_hpa_to_altitude_meters(const double ground_height_above_sea_level)
 {
     // From this formula: https://en.wikipedia.org/wiki/Pressure_altitude
