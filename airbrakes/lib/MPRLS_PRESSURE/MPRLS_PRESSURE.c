@@ -3,12 +3,12 @@
 #include <math.h>
 #include <stm32h7xx_hal.h>
 
+#include "I2C_DMA.h"
+
 double mprls_pressure_hpa = -1.0;
 double mprls_altitude_meters = -1.0;
 uint8_t mprls_pressure_rx_buffer[4] = {0};
 MPRLS_STATUS mprls_status = MPRLS_UNINITIALIZED;
-
-extern I2C_HandleTypeDef i2c1_handle;
 
 static uint8_t measurement_command[3] = {0xAA, 0x00, 0x00};
 
