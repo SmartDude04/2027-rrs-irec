@@ -24,7 +24,13 @@ int main(void)
     Servo_Init_TIM3_PA6();
     I2C_DMA_Init();
     mprls_init();
-    imu_init();
+    const HAL_StatusTypeDef imu_init_status = imu_init();
+    if (imu_init_status != HAL_OK)
+    {
+        HAL_Delay(3000);
+        USB_CDC_PRINTF("Failed to initialize IMU: Failed with code %d\n", imu_init_status);
+        while (1);
+    }
     
     
     while (1)
@@ -34,11 +40,13 @@ int main(void)
         
         if (new_pressure)
         {
+            HAL_Delay(10);
             USB_CDC_PRINTF("Pressure (hPa): %lf\tAltitude (m): %lf\n", pressure_hpa, altitude_m);
             new_pressure = 0;
         }
         if (new_imu)
         {
+            HAL_Delay(10);
             USB_CDC_PRINTF("ax: %lf ay: %lf ax: %lf gx %lf gy %lf gz %lf\n",
                 imu_data.acceleration_x_meters_per_second_squared,
                 imu_data.acceleration_y_meters_per_second_squared,
