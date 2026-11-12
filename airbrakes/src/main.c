@@ -5,8 +5,8 @@
 #include "usb_cdc.h"
 #include "servo.h"
 #include "I2C_DMA.h"
-#include "../lib/ICM_20948_IMU/ICM_20948_IMU.h"
-#include "../lib/MPRLS_PRESSURE/MPRLS_PRESSURE.h"
+#include "ICM_20948_IMU.h"
+#include "MPRLS_PRESSURE.h"
 
 static void run_mprls();
 static void run_imu();
