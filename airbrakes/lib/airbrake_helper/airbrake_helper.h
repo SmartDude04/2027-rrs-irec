@@ -9,4 +9,12 @@
  */
 float airbrake_drag_coefficient(float airbrake_active_area);
 
+/**
+ * Performs a lookup/approximation of the coefficient of drag for the rocket given the airbrake opening amount
+ * 
+ * @param airbrake_active_area Area of the airbrake in the wind stream being used to slow the rocket down
+ * @return The CFD-derived coefficient of drag for the airbrake
+ */
+float rocket_drag_coefficient(float airbrake_active_area);
+
 #endif
