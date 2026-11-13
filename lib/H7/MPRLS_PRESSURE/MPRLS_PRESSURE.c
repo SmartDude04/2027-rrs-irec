@@ -4,12 +4,15 @@
 #include <stm32h7xx_hal.h>
 
 #include "I2C_DMA.h"
+#include "ICM_20948_IMU.h"
 
 #define STANDARD_TEMPERATURE_KELVIN 288.16f
 #define HEIGHT_TEMP_SCALE_FACTOR 0.0065f
 #define STANDARD_PRESSURE_PASCALS 101325f
 #define STANDARD_DENSITY_KG_M3 1.225f
 #define POWER 5.2561f
+#define SPECIFIC_GAS_CONSTANT_DRY_AIR 287.05f
+#define RATIO_SPECIFIC_HEATS_AIR 1.4f
 
 uint8_t mprls_pressure_rx_buffer[4] = {0};
 MPRLS_STATUS mprls_status = MPRLS_UNINITIALIZED;
@@ -80,28 +83,29 @@ float pressure_psi_from_rx_buffer()
     return ((float) pressure_raw - output_min) / (output_max - output_min) * (pressure_max - pressure_min) + pressure_min;
 }
 
-float pressure_psi_to_hpa(const float pressure_psi)
+float pressure_to_hpa(const float pressure_psi)
 {
     return pressure_psi * 68.9476f;
 }
 
-float pressure_hpa_to_altitude_meters(const float pressure_hpa)
+float altitude_meters(const float pressure_hpa)
 {
     // From this formula: https://en.wikipedia.org/wiki/Pressure_altitude
-    return 0.3048f * 145366.45f * (1 - powf(pressure_hpa / 1013.25f, 0.190284f)) - LAUNCH_SITE_ALTITUDE_ABOVE_SEA_LEVEL;
+    return 0.3048f * 145366.45f * (1 - powf(pressure_hpa / LAUNCH_PRESSURE_HPA, 0.190284f));
 }
 
-float altitude_meters_to_air_density_kg_per_meter_cubed(const float altitude_meters)
+float air_density_kg_per_meter_cubed(const float pressure_hpa, const float temperature_celsius)
 {
-    // From this formula: https://physics.stackexchange.com/questions/299907/air-density-as-a-function-of-altitude-only
-    const float estimated_temperature_kelvin = STANDARD_TEMPERATURE_KELVIN - HEIGHT_TEMP_SCALE_FACTOR * altitude_meters;
+    const float temperature_kelvin = celsius_to_kelvin(temperature_celsius);
+    const float pressure_pascals = pressure_hpa * 100.0f;
     
-    return STANDARD_DENSITY_KG_M3 * powf(estimated_temperature_kelvin / STANDARD_TEMPERATURE_KELVIN, HEIGHT_TEMP_SCALE_FACTOR - 1);
+    return pressure_pascals / (SPECIFIC_GAS_CONSTANT_DRY_AIR * temperature_kelvin);
 }
 
-float density_kg_per_meter_cubed_to_speed_of_sound_meters_per_second(float density_kg_meters_cubed)
+float speed_of_sound_meters_per_second(const float pressure_hpa, const float density_kg_meters_cubed)
 {
-    
+    const float pressure_pascals = pressure_hpa * 100;
+    return sqrtf(RATIO_SPECIFIC_HEATS_AIR * pressure_pascals / density_kg_meters_cubed);
 }
 
 void EXTI9_5_IRQHandler(void)

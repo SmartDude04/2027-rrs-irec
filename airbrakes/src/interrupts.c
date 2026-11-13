@@ -4,11 +4,6 @@
 #include "MPRLS_PRESSURE.h"
 #include "I2C_DMA.h"
 
-volatile float pressure_hpa;
-volatile float altitude_meters;
-volatile float air_density_kg_m_cubed;
-volatile IMU_Data imu_data;
-
 /**
  * Called when a write is finished from HAL_I2C_Master_Transmit_DMA()
  */

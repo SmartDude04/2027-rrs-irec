@@ -6,7 +6,7 @@
 #include "stm32h7xx_hal.h"
 
 #define MPRLS_PRESSURE_I2C_ADDRESS 0x18
-#define LAUNCH_SITE_ALTITUDE_ABOVE_SEA_LEVEL 0
+#define LAUNCH_PRESSURE_HPA 1013.25f
 
 typedef enum
 {
@@ -55,7 +55,7 @@ float pressure_psi_from_rx_buffer();
 /**
  * Converts the pressure in PSI to hPa
  */
-float pressure_psi_to_hpa(float pressure_psi);
+float pressure_to_hpa(float pressure_psi);
 
 /**
  * Converts a pressure reading to a relative altitude above the ground
@@ -63,23 +63,25 @@ float pressure_psi_to_hpa(float pressure_psi);
  * @param pressure_hpa Height, in meters, of the launch site above sea level
  * @return Altitude of the rocket above the launch site, in meters
  */
-float pressure_hpa_to_altitude_meters(float pressure_hpa);
+float altitude_meters(float pressure_hpa);
 
 /**
- * Converts an altitude reading to an estimated air density
+ * Converts a pressure and temperature reading to an estimated air density
  * 
- * @param altitude_meters Height, in meters, of the rocket
+ * @param pressure_hpa Pressure, in hPa, of the air
+ * @param temperature_celsius Temperature, in Celsius, of the air
  * @return Estimated air density in kilograms per meter cubed
  */
-float altitude_meters_to_air_density_kg_per_meter_cubed(float altitude_meters);
+float air_density_kg_per_meter_cubed(float pressure_hpa, float temperature_celsius);
 
 /**
- * Converts an air density reading to a speed of sound estimated
+ * Converts a pressure and air density reading to a speed of sound estimated
  * 
+ * @param pressure_hpa Pressure of the air, in hectopascals
  * @param density_kg_meters_cubed Air density in kilograms per meter cubed
  * @return The current estimated speed of sound
  */
-float density_kg_per_meter_cubed_to_speed_of_sound_meters_per_second(float density_kg_meters_cubed);
+float speed_of_sound_meters_per_second(float pressure_hpa, float density_kg_meters_cubed);
 
 
 #endif

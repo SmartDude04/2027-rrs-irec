@@ -10,7 +10,13 @@
 #define GYRO_CONFIG_BANK_2 0x01
 #define ACCEL_XOUT_H 0x2D
 
-uint8_t icm_20948_rx_buffer[12] = {0};
+#define ACCEL_SENSITIVITY 4096.0f
+#define GYRO_SENSITIVITY 32.8f
+#define ACCELERATION_GRAVITY_MS2 9.80665f
+#define TEMPERATURE_SENSITIVITY 333.87f
+#define ROOM_TEMP_OFFSET 21.0f
+
+uint8_t icm_20948_rx_buffer[14] = {0};
 IMU_STATUS imu_status = IMU_UNINITIALIZED;
 
 static TIM_HandleTypeDef tim4_handle;
@@ -115,17 +121,24 @@ IMU_Data imu_data_from_rx_buffer()
     const int16_t raw_gyro_x = (int16_t)(((uint16_t) icm_20948_rx_buffer[6] << 8) + icm_20948_rx_buffer[7]);
     const int16_t raw_gyro_y = (int16_t)(((uint16_t) icm_20948_rx_buffer[8] << 8) + icm_20948_rx_buffer[9]);
     const int16_t raw_gyro_z = (int16_t)(((uint16_t) icm_20948_rx_buffer[10] << 8) + icm_20948_rx_buffer[11]);
+    const int16_t raw_temp_celsius = (int16_t)(((uint16_t) icm_20948_rx_buffer[12] << 8) + icm_20948_rx_buffer[13]);
     
-    // Raw is converted using conversion from sections 3.1 and 3.2
+    // Raw is converted using conversion from sections 3.1 and 3.2 and 3.4
     // https://cdn.sparkfun.com/assets/7/f/e/c/d/DS-000189-ICM-20948-v1.3.pdf
-    data.acceleration_x_meters_per_second_squared = 9.80665f * ((float) raw_accel_x) / 4096.0f;
-    data.acceleration_y_meters_per_second_squared = 9.80665f * ((float) raw_accel_y) / 4096.0f;
-    data.acceleration_z_meters_per_second_squared = 9.80665f * ((float) raw_accel_z) / 4096.0f;
-    data.gyro_x_degrees_per_second = ((float) raw_gyro_x) / 32.8f;
-    data.gyro_y_degrees_per_second = ((float) raw_gyro_y) / 32.8f;
-    data.gyro_z_degrees_per_second = ((float) raw_gyro_z) / 32.8f;
+    data.acceleration_x_meters_per_second_squared = ACCELERATION_GRAVITY_MS2 * ((float) raw_accel_x) / ACCEL_SENSITIVITY;
+    data.acceleration_y_meters_per_second_squared = ACCELERATION_GRAVITY_MS2 * ((float) raw_accel_y) / ACCEL_SENSITIVITY;
+    data.acceleration_z_meters_per_second_squared = ACCELERATION_GRAVITY_MS2 * ((float) raw_accel_z) / ACCEL_SENSITIVITY;
+    data.gyro_x_degrees_per_second = ((float) raw_gyro_x) / GYRO_SENSITIVITY;
+    data.gyro_y_degrees_per_second = ((float) raw_gyro_y) / GYRO_SENSITIVITY;
+    data.gyro_z_degrees_per_second = ((float) raw_gyro_z) / GYRO_SENSITIVITY;
+    data.temperature_celsius = ((float) raw_temp_celsius) / TEMPERATURE_SENSITIVITY + ROOM_TEMP_OFFSET;
     
     return data;
+}
+
+float celsius_to_kelvin(const float temperature_celsius)
+{
+    return temperature_celsius + 273.15f;
 }
 
 void TIM4_IRQHandler(void)
