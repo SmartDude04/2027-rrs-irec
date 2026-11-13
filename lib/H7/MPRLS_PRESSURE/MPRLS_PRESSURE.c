@@ -94,12 +94,11 @@ float altitude_meters(const float pressure_hpa)
     return 0.3048f * 145366.45f * (1 - powf(pressure_hpa / LAUNCH_PRESSURE_HPA, 0.190284f));
 }
 
-float air_density_kg_per_meter_cubed(const float pressure_hpa, const float temperature_celsius)
+float air_density_kg_per_meter_cubed(const float pressure_hpa)
 {
-    const float temperature_kelvin = celsius_to_kelvin(temperature_celsius);
     const float pressure_pascals = pressure_hpa * 100.0f;
     
-    return pressure_pascals / (SPECIFIC_GAS_CONSTANT_DRY_AIR * temperature_kelvin);
+    return pressure_pascals / (SPECIFIC_GAS_CONSTANT_DRY_AIR * STANDARD_TEMPERATURE_KELVIN);
 }
 
 float speed_of_sound_meters_per_second(const float pressure_hpa, const float density_kg_meters_cubed)
