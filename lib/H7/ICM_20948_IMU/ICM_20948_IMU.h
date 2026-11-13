@@ -20,12 +20,12 @@ extern IMU_STATUS imu_status;
 
 typedef struct
 {
-    double acceleration_x_meters_per_second_squared;
-    double acceleration_y_meters_per_second_squared;
-    double acceleration_z_meters_per_second_squared;
-    double gyro_x_degrees_per_second;
-    double gyro_y_degrees_per_second;
-    double gyro_z_degrees_per_second;
+    float acceleration_x_meters_per_second_squared;
+    float acceleration_y_meters_per_second_squared;
+    float acceleration_z_meters_per_second_squared;
+    float gyro_x_degrees_per_second;
+    float gyro_y_degrees_per_second;
+    float gyro_z_degrees_per_second;
 } IMU_Data;
 
 

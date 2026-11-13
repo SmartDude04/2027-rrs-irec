@@ -7,18 +7,19 @@
 #include "I2C_DMA.h"
 #include "ICM_20948_IMU.h"
 #include "MPRLS_PRESSURE.h"
+#include "finite_state_machine.h"
 
 static void run_mprls();
 static void run_imu();
 
 static volatile uint8_t new_pressure = 0;
 static volatile uint8_t new_imu = 0;
-static volatile double pressure_hpa;
-static volatile double altitude_m;
-static volatile IMU_Data imu_data;
+
+Airbrakes_Finite_State_Machine airbrakes_state = DISARMED;
 
 int main(void)
 {
+    // TODO: Add better error handling all around, and especially in init functions
     HAL_Init();
     USB_CDC_INIT();
     Servo_Init_TIM3_PA6();
@@ -46,7 +47,7 @@ int main(void)
         if (new_pressure)
         {
             HAL_Delay(10);
-            USB_CDC_PRINTF("Pressure (hPa): %lf\tAltitude (m): %lf\n", pressure_hpa, altitude_m);
+            USB_CDC_PRINTF("Pressure (hPa): %lf\tAltitude (m): %lf\t Air density (kg/m^3): %lf\n", pressure_hpa, altitude_meters, air_density_kg_m_cubed);
             new_pressure = 0;
         }
         if (new_imu)
@@ -91,7 +92,9 @@ void run_mprls()
     if (mprls_status == MPRLS_DATA_READY)
     {
         pressure_hpa = pressure_psi_to_hpa(pressure_psi_from_rx_buffer());
-        altitude_m = pressure_hpa_to_altitude_meters(pressure_hpa);
+        altitude_meters = pressure_hpa_to_altitude_meters(pressure_hpa);
+        air_density_kg_m_cubed = altitude_meters_to_air_density_kg_per_meter_cubed(altitude_meters);
+        
         new_pressure = 1;
         mprls_status = MPRLS_IDLE;
     }
@@ -112,75 +115,5 @@ void run_imu()
     {
         imu_data = imu_data_from_rx_buffer();
         new_imu = 1;
-    }
-}
-
-/**
- * Called when a write is finished from HAL_I2C_Master_Transmit_DMA()
- */
-void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
-{
-    if (hi2c->Devaddress == MPRLS_PRESSURE_I2C_ADDRESS << 1)
-    {
-        if (mprls_status == MPRLS_TX_PENDING)
-        {
-            mprls_status = MPRLS_MEASURING;
-        }
-    }
-}
-
-/**
- * Called when DMA memory is ready from HAL_I2C_Master_Receive_DMA() read
- */
-void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
-{
-    if (hi2c == &i2c1_handle && hi2c->Devaddress == MPRLS_PRESSURE_I2C_ADDRESS << 1)
-    {
-        if (mprls_status == MPRLS_RX_PENDING)
-        {
-            mprls_status = MPRLS_DATA_READY;
-        }
-    }
-}
-
-/**
- * Called when DMA memory is ready from HAL_I2C_Mem_Read_DMA() read
- */
-void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
-{
-    if (hi2c == &i2c2_handle && hi2c->Devaddress == ICM_20948_I2C_ADDRESS << 1)
-    {
-        if (imu_status == IMU_RX_PENDING)
-        {
-            imu_status = IMU_DATA_READY;
-        }
-    }
-}
-
-/**
- * Called during GPIO interrupt
- */
-void HAL_GPIO_EXTI_Callback(const uint16_t GPIO_Pin)
-{
-    if (GPIO_Pin == GPIO_PIN_8)
-    {
-        if (mprls_status == MPRLS_MEASURING)
-        {
-            mprls_status = MPRLS_MEASURED;
-        }
-    }
-}
-
-/**
- * Called when a timer interrupt is set to fire
- */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-    if (htim->Instance == TIM4)
-    {
-        if (imu_status == IMU_DATA_READY)
-        {
-            imu_status = IMU_IDLE;
-        }
     }
 }

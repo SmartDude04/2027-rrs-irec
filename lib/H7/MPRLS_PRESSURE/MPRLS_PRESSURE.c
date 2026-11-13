@@ -5,8 +5,12 @@
 
 #include "I2C_DMA.h"
 
-double mprls_pressure_hpa = -1.0;
-double mprls_altitude_meters = -1.0;
+#define STANDARD_TEMPERATURE_KELVIN 288.16f
+#define HEIGHT_TEMP_SCALE_FACTOR 0.0065f
+#define STANDARD_PRESSURE_PASCALS 101325f
+#define STANDARD_DENSITY_KG_M3 1.225f
+#define POWER 5.2561f
+
 uint8_t mprls_pressure_rx_buffer[4] = {0};
 MPRLS_STATUS mprls_status = MPRLS_UNINITIALIZED;
 
@@ -64,27 +68,40 @@ HAL_StatusTypeDef start_mprls_dma_read()
     return ret;
 }
 
-double pressure_psi_from_rx_buffer()
+float pressure_psi_from_rx_buffer()
 {
-    const double output_min = 0x19999Au;
-    const double output_max = 0xE66666u;
-    const double pressure_min = 0.0f;
-    const double pressure_max = 25.0f;
+    const float output_min = 0x19999Au;
+    const float output_max = 0xE66666u;
+    const float pressure_min = 0.0f;
+    const float pressure_max = 25.0f;
     
     const uint32_t pressure_raw = (mprls_pressure_rx_buffer[1] << 16) + (mprls_pressure_rx_buffer[2] << 8) + mprls_pressure_rx_buffer[3];
     
-    return (pressure_raw - output_min) / (output_max - output_min) * (pressure_max - pressure_min) + pressure_min;
+    return ((float) pressure_raw - output_min) / (output_max - output_min) * (pressure_max - pressure_min) + pressure_min;
 }
 
-double pressure_psi_to_hpa(const double pressure_psi)
+float pressure_psi_to_hpa(const float pressure_psi)
 {
-    return pressure_psi * 68.9476;
+    return pressure_psi * 68.9476f;
 }
 
-double pressure_hpa_to_altitude_meters(const double ground_height_above_sea_level)
+float pressure_hpa_to_altitude_meters(const float pressure_hpa)
 {
     // From this formula: https://en.wikipedia.org/wiki/Pressure_altitude
-    return 0.3048 * 145366.45 * (1 - pow(ground_height_above_sea_level / 1013.25, 0.190284)) - LAUNCH_SITE_ALTITUDE_ABOVE_SEA_LEVEL;
+    return 0.3048f * 145366.45f * (1 - powf(pressure_hpa / 1013.25f, 0.190284f)) - LAUNCH_SITE_ALTITUDE_ABOVE_SEA_LEVEL;
+}
+
+float altitude_meters_to_air_density_kg_per_meter_cubed(const float altitude_meters)
+{
+    // From this formula: https://physics.stackexchange.com/questions/299907/air-density-as-a-function-of-altitude-only
+    const float estimated_temperature_kelvin = STANDARD_TEMPERATURE_KELVIN - HEIGHT_TEMP_SCALE_FACTOR * altitude_meters;
+    
+    return STANDARD_DENSITY_KG_M3 * powf(estimated_temperature_kelvin / STANDARD_TEMPERATURE_KELVIN, HEIGHT_TEMP_SCALE_FACTOR - 1);
+}
+
+float density_kg_per_meter_cubed_to_speed_of_sound_meters_per_second(float density_kg_meters_cubed)
+{
+    
 }
 
 void EXTI9_5_IRQHandler(void)

@@ -21,8 +21,6 @@ typedef enum
 
 extern MPRLS_STATUS mprls_status;
 
-extern double mprls_pressure_hpa;
-extern double mprls_altitude_meters;
 extern uint8_t mprls_pressure_rx_buffer[4];
 
 /**
@@ -52,19 +50,36 @@ HAL_StatusTypeDef start_mprls_dma_read();
  * Using data in mprls_pressure_rx_buffer, returns the pressure in PSI
  * @return The pressure, in PSI
  */
-double pressure_psi_from_rx_buffer();
+float pressure_psi_from_rx_buffer();
 
 /**
  * Converts the pressure in PSI to hPa
  */
-double pressure_psi_to_hpa(double pressure_psi);
+float pressure_psi_to_hpa(float pressure_psi);
 
 /**
  * Converts a pressure reading to a relative altitude above the ground
  * 
- * @param ground_height_above_sea_level Height, in meters, of the launch site above sea level
+ * @param pressure_hpa Height, in meters, of the launch site above sea level
  * @return Altitude of the rocket above the launch site, in meters
  */
-double pressure_hpa_to_altitude_meters(double ground_height_above_sea_level);
+float pressure_hpa_to_altitude_meters(float pressure_hpa);
+
+/**
+ * Converts an altitude reading to an estimated air density
+ * 
+ * @param altitude_meters Height, in meters, of the rocket
+ * @return Estimated air density in kilograms per meter cubed
+ */
+float altitude_meters_to_air_density_kg_per_meter_cubed(float altitude_meters);
+
+/**
+ * Converts an air density reading to a speed of sound estimated
+ * 
+ * @param density_kg_meters_cubed Air density in kilograms per meter cubed
+ * @return The current estimated speed of sound
+ */
+float density_kg_per_meter_cubed_to_speed_of_sound_meters_per_second(float density_kg_meters_cubed);
+
 
 #endif

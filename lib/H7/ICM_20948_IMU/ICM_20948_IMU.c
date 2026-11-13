@@ -118,12 +118,12 @@ IMU_Data imu_data_from_rx_buffer()
     
     // Raw is converted using conversion from sections 3.1 and 3.2
     // https://cdn.sparkfun.com/assets/7/f/e/c/d/DS-000189-ICM-20948-v1.3.pdf
-    data.acceleration_x_meters_per_second_squared = 9.80665 * ((double) raw_accel_x) / 4096.0;
-    data.acceleration_y_meters_per_second_squared = 9.80665 * ((double) raw_accel_y) / 4096.0;
-    data.acceleration_z_meters_per_second_squared = 9.80665 * ((double) raw_accel_z) / 4096.0;
-    data.gyro_x_degrees_per_second = ((double) raw_gyro_x) / 32.8;
-    data.gyro_y_degrees_per_second = ((double) raw_gyro_y) / 32.8;
-    data.gyro_z_degrees_per_second = ((double) raw_gyro_z) / 32.8;
+    data.acceleration_x_meters_per_second_squared = 9.80665f * ((float) raw_accel_x) / 4096.0f;
+    data.acceleration_y_meters_per_second_squared = 9.80665f * ((float) raw_accel_y) / 4096.0f;
+    data.acceleration_z_meters_per_second_squared = 9.80665f * ((float) raw_accel_z) / 4096.0f;
+    data.gyro_x_degrees_per_second = ((float) raw_gyro_x) / 32.8f;
+    data.gyro_y_degrees_per_second = ((float) raw_gyro_y) / 32.8f;
+    data.gyro_z_degrees_per_second = ((float) raw_gyro_z) / 32.8f;
     
     return data;
 }
