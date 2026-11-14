@@ -26,5 +26,6 @@ enum message_type {
 
 // Can equal a message_type to tell other parts of the program what message has arrived
 uint8_t radio_flag;
+uint8_t command_status;
 
 #endif
