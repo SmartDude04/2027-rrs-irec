@@ -10,8 +10,8 @@
 #define GYRO_CONFIG_BANK_2 0x01
 #define ACCEL_XOUT_H 0x2D
 
-#define ACCEL_SENSITIVITY 4096.0f
-#define GYRO_SENSITIVITY 32.8f
+#define ACCEL_SENSITIVITY 2048.0f
+#define GYRO_SENSITIVITY 131.0f
 #define ACCELERATION_GRAVITY_MS2 9.80665f
 #define TEMPERATURE_SENSITIVITY 333.87f
 #define ROOM_TEMP_OFFSET 21.0f
@@ -54,12 +54,14 @@ HAL_StatusTypeDef imu_init()
     status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, REG_BANK_SEL, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00100000}, 1, 1000);
     if (status != HAL_OK) { return status; }
     
-    // Set acceleration limit to plus.minus 8G
-    status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, ACCEL_CONFIG_BANK_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00000100, 0x00}, 2, 1000);
+    // Set acceleration limit to plus.minus 16 G
+    // Additionally enable the low pass filter that will be good for just above 100 Hz
+    status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, ACCEL_CONFIG_BANK_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00010111, 0x00}, 2, 1000);
     if (status != HAL_OK) { return status; }
     
-    // Set gyro limit to plus.minus 1000 dps
-    status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, GYRO_CONFIG_BANK_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00000100, 0x00}, 2, 1000);
+    // Set gyro limit to plus.minus 250 dps
+    // Additionally enable the low pass filte that will be good for just above 100 Hz
+    status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, GYRO_CONFIG_BANK_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00010001, 0x00}, 2, 1000);
     if (status != HAL_OK) { return status; }
     
     // Switch back to bank 0
