@@ -27,15 +27,12 @@ lora_sx1276 lora = {
 };
 struct radio_link link;
 
-struct protocol_packet packet = {
-	.source = NODE_GROUND_STATION,
-	.destination = NODE_PAYLOAD,
-	.message_type = MSG_HEARTBEAT,
-	.sequence = 0x1234,
-	.data_length = 1,
-	.data = {32}
-};
-uint8_t buf1[MAX_PACKET_LENGTH];
+struct protocol_packet packet;
+
+uint8_t res;
+uint8_t data= 1;
+uint8_t buf[LORA_MAX_PACKET_SIZE];
+uint32_t start_time;
 
 int main(void)
 {
@@ -45,10 +42,22 @@ int main(void)
 	LED_Init();
 	SPI_Init();
 	HAL_Delay(5000);
-	uint8_t res = radio_link_init(&lora, &link, NODE_GROUND_STATION);
-
+	radio_link_init(&lora, &link, NODE_GROUND_STATION);
+	SerialWrite("Ground Station Start\n");
+	start_time = HAL_GetTick();
 	while (1)
 	{
+		if (HAL_GetTick() - start_time > 500) {
+			radio_checkin(&link, NODE_PAYLOAD);
+			start_time = HAL_GetTick();
+		}
+
+		radio_rx_process(&link);
+		if (radio_flag == MSG_HEARTBEAT_ACK + NODE_PAYLOAD) {
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+			SerialWrite("Got heartbeat\n");
+			radio_flag = 0;
+		}
 	}
 	
 	

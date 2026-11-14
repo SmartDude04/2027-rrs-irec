@@ -35,21 +35,36 @@ lora_sx1276 lora = {
 };
 struct radio_link link;
 
+uint8_t res;
+uint8_t data = 0;
+struct protocol_packet packet;
+uint8_t buf[LORA_MAX_PACKET_SIZE];
+
 int main() {
     HAL_Init();
     SystemClock_Config();
     LED_Init();
     MX_USB_DEVICE_Init();
-	MX_SDIO_SD_Init();
-	MX_FATFS_Init();
-	SPI_Init();
-	radio_link_init(&lora, &link, NODE_PAYLOAD);
+    MX_SDIO_SD_Init();
+    MX_FATFS_Init();
+    SPI_Init();
 	HAL_Delay(5000);
-
+    radio_link_init(&lora, &link, NODE_PAYLOAD);
+	SerialWrite("Payload Start\n");
     while (1) {
 
+		radio_rx_process(&link);
+		// radio_link_receive(&link);
+		// if (radio_link_message_available(&link)) {
+		// 	radio_link_get_message(&link, &packet);
+		// 	if (packet.message_type == MSG_HEARTBEAT) {
+		// 		SerialWrite("Got heartbeat: %u\n", packet.source);
+		// 		if (radio_link_send(&link, NODE_GROUND_STATION, MSG_HEARTBEAT_ACK, NULL, 0) == RADIO_OK) {
+		// 			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+		// 		}
+		// 	}
+		// }
 	}
-		
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {

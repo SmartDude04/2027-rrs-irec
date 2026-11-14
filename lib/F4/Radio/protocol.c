@@ -2,10 +2,6 @@
 #include <stddef.h>
 
 bool protocol_encode(const struct protocol_packet *packet, uint8_t *buf) {
-    if (packet == NULL || buf == NULL) { // check if packet and buf exsist
-        return false;
-    }
-
     // Index through byte array and encode each corresponding component to packet format
     uint8_t index = 0;
     buf[index] = packet->source;
@@ -29,10 +25,6 @@ bool protocol_encode(const struct protocol_packet *packet, uint8_t *buf) {
 }
 
 bool protocol_decode(struct protocol_packet *packet, const uint8_t *buf) {
-    if (buf == NULL || packet == NULL) {
-        return false;
-    }
-    
     // Save each formatted packet component to byte array
     uint8_t index = 0;
 
