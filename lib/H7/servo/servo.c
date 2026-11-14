@@ -2,14 +2,14 @@
 
 #include "stm32h7xx_hal.h"
 
-static void PWM_GPIO_Init_PA6(void);
+static void PWM_GPIO_Init_PB4(void);
 static void PWM_TIM3_Init(void);
 
 static TIM_HandleTypeDef tim3_handle;
 
-void Servo_Init_TIM3_PA6(void)
+void Servo_Init_TIM3_PB4(void)
 {
-    PWM_GPIO_Init_PA6();
+    PWM_GPIO_Init_PB4();
     PWM_TIM3_Init();
     
     if (HAL_TIM_PWM_Start(&tim3_handle, TIM_CHANNEL_1) != HAL_OK) {
@@ -24,21 +24,21 @@ void Servo_Move_Degrees(uint8_t degrees)
     __HAL_TIM_SET_COMPARE(&tim3_handle, TIM_CHANNEL_1, period_us);
 }
 
-void PWM_GPIO_Init_PA6(void)
+void PWM_GPIO_Init_PB4(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct;
     
-    // Enable GPIOA Clock
-    __HAL_RCC_GPIOA_CLK_ENABLE();
+    // Enable GPIOB Clock
+    __HAL_RCC_GPIOB_CLK_ENABLE();
     
-    // Configure PA6 to use TIM3_CH1
-    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    // Configure PB4 to use TIM3_CH1
+    GPIO_InitStruct.Pin = GPIO_PIN_4;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF2_TIM3;
     
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
 void PWM_TIM3_Init(void)

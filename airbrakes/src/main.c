@@ -44,13 +44,14 @@ int main(void)
     // TODO: Add better error handling all around, and especially in init functions
     HAL_Init();
     USB_CDC_INIT();
-    Servo_Init_TIM3_PA6();
+    Servo_Init_TIM3_PB4();
     I2C_DMA_Init();
     mprls_init();
     DWT_Init();
     MX_USB_DEVICE_Init();
     MX_SDMMC1_SD_Init();
     MX_FATFS_Init();
+    SPI_Init();
     const HAL_StatusTypeDef imu_init_status = imu_init();
     if (imu_init_status != HAL_OK)
     {
