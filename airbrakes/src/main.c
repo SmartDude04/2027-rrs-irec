@@ -5,6 +5,7 @@
 #include "usb_cdc.h"
 #include "servo.h"
 #include "I2C_DMA.h"
+#include "constants.h"
 #include "ICM_20948_IMU.h"
 #include "MPRLS_PRESSURE.h"
 #include "usb_device.h"
@@ -65,71 +66,34 @@ int main(void)
      * calls MX_USB_DEVICE_Init in your project; initialize USB only once.
      */
     USB_CDC_INIT();
-    Servo_Init_TIM3_PA6();
-    I2C_DMA_Init();
-    mprls_init();
+    // Servo_Init_TIM3_PA6();
+    // I2C_DMA_Init();
+    // mprls_init();
 
-    const HAL_StatusTypeDef imu_init_status = imu_init();
-    if (imu_init_status != HAL_OK)
-    {
-        HAL_Delay(3000);
-        USB_CDC_PRINTF("Failed to initialize IMU: Failed with code %d\n",
-                       imu_init_status);
-        while (1)
-        {
-        }
-    }
+    // const HAL_StatusTypeDef imu_init_status = imu_init();
+    // if (imu_init_status != HAL_OK)
+    // {
+    //     HAL_Delay(3000);
+    //     USB_CDC_PRINTF("Failed to initialize IMU: Failed with code %d\n",
+    //                    imu_init_status);
+    //     while (1)
+    //     {
+    //     }
+    // }
 
-    /* Review MPU/DMA memory configuration and initialization order with
-     * your board setup; the MPU_Config implementation was not supplied.
-     */
     MPU_Config();
     MX_USB_DEVICE_Init();
     MX_SDMMC1_SD_Init();
     MX_FATFS_Init();
 
+    HAL_Delay(10000);
+
     airbrake_start();
     state = WaitingForLaunch;
-
-    HAL_Delay(10000);
 
     USB_CDC_PRINTF("Beginning test flight...\n");
 
     test_flight();
-
-    // while (1)
-    // {
-    //     run_mprls();
-    //     run_imu();
-
-    //     if (new_pressure)
-    //     {
-    //         HAL_Delay(10);
-    //         USB_CDC_PRINTF("Pressure (raw): %lu\n",
-    //                        (unsigned long)raw_pressure);
-    //         new_pressure = 0;
-    //     }
-
-    //     if (new_imu)
-    //     {
-    //         HAL_Delay(10);
-    //         USB_CDC_PRINTF("ax: %lf ay: %lf az: %lf gx: %lf gy: %lf gz: %lf\n",
-    //                        imu_data.acceleration_x_meters_per_second_squared,
-    //                        imu_data.acceleration_y_meters_per_second_squared,
-    //                        imu_data.acceleration_z_meters_per_second_squared,
-    //                        imu_data.gyro_x_degrees_per_second,
-    //                        imu_data.gyro_y_degrees_per_second,
-    //                        imu_data.gyro_z_degrees_per_second);
-    //         new_imu = 0;
-    //     }
-
-    //     HAL_Delay(1);
-
-    //     /* TODO: Convert calibrated pressure to altitude, estimate vertical
-    //      * velocity and call airbrake_tick only during Coast, at AB_DT_MPC.
-    //      * The enum alone does not implement flight-state transitions.
-    //      */
-    // }
 }
 
 static void run_mprls(void)
@@ -201,7 +165,7 @@ static void run_imu(void)
 void airbrake_start(void)
 {
     ab_rocket_t model = ab_default_rocket();
-    airbrake_mpc_init(&mpc, &model, AB_TARGET_APOGEE_M);
+    airbrake_mpc_init(&mpc, &model, DESIRED_APOGEE_METERS);
 }
 
 // void airbrake_tick(float alt_m, float vz_mps)
@@ -291,10 +255,12 @@ void test_flight(void)
         float accel = frame.accel;
         float pressure = frame.pressure;
 
-        float alpha = airbrake_tick(altitude, velo);
-
-        USB_CDC_PRINTF("alpha: %.2f, t: %.2f, h: %.3f, v: %.3f, a: %.3f, rho: %.3f\n",
-                       alpha, time, altitude, velo, accel, pressure);
+        ab_info_t info;
+        float alpha = airbrake_mpc_step(&mpc, altitude, velo, &info);
+        USB_CDC_PRINTF("alpha: %4.3f, time: %3.2f; height: %4.1f; velo: %3.1f; predicted_apogee: %4.1f; status: %ld; iterations: %ld, fallback: %ld\n",
+                       alpha, time, altitude, velo, info.apogee_pred_m,
+                       (long)info.solver_status, (long)info.solver_iters,
+                       (long)info.used_fallback);
     }
 }
 

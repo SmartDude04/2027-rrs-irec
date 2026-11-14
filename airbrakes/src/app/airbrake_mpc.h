@@ -11,7 +11,10 @@
 #define AIRBRAKE_MPC_H
 
 #include <stdint.h>
+
 #include "airbrake_config.h"
+#include "airbrake_helper.h"
+#include "constants.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,8 +26,6 @@ typedef struct {
   float body_area;
   float body_cd;
   float ab_area;
-  float ab_cd;
-  float cd_scale;     /* 1.0 for the controller's model; != 1 only in tests */
 } ab_rocket_t;
 
 /* Diagnostics returned by each step */
