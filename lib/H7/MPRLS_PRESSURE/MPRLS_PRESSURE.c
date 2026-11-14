@@ -15,8 +15,8 @@
 #define RATIO_SPECIFIC_HEATS_AIR 1.4f
 #define TEMPERATURE_LAPSE_RATE 0.0065f
 
-uint8_t mprls_pressure_rx_buffer[4] = {0};
-MPRLS_STATUS mprls_status = MPRLS_UNINITIALIZED;
+uint8_t volatile mprls_pressure_rx_buffer[4] = {0};
+MPRLS_STATUS volatile mprls_status = MPRLS_UNINITIALIZED;
 
 static uint8_t measurement_command[3] = {0xAA, 0x00, 0x00};
 
@@ -64,7 +64,7 @@ HAL_StatusTypeDef start_mprls_dma_read()
     
     i2c1_handle.Devaddress = MPRLS_PRESSURE_I2C_ADDRESS << 1;
     
-    const HAL_StatusTypeDef ret = HAL_I2C_Master_Receive_DMA(&i2c1_handle, MPRLS_PRESSURE_I2C_ADDRESS << 1, mprls_pressure_rx_buffer, 4);
+    const HAL_StatusTypeDef ret = HAL_I2C_Master_Receive_DMA(&i2c1_handle, MPRLS_PRESSURE_I2C_ADDRESS << 1, (uint8_t *) mprls_pressure_rx_buffer, 4);
     if (ret == HAL_OK)
     {
         mprls_status = MPRLS_RX_PENDING;

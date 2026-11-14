@@ -19,9 +19,9 @@ typedef enum
     MPRLS_DATA_READY // I2C request is complete and data is in *mprls_pressure_rx_buffer
 } MPRLS_STATUS;
 
-extern MPRLS_STATUS mprls_status;
+extern volatile MPRLS_STATUS mprls_status;
 
-extern uint8_t mprls_pressure_rx_buffer[4];
+extern uint8_t volatile mprls_pressure_rx_buffer[4];
 
 /**
  * Initializes the MPRLS pressure sensor. Specifically, sets PB8 as input to be called when data is ready

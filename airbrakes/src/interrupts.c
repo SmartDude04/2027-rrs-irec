@@ -67,9 +67,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM4)
     {
-        if (imu_status == IMU_DATA_READY)
+        if (imu_status == IMU_IDLE)
         {
-            imu_status = IMU_IDLE;
+            imu_status = IMU_MAKE_MEASUREMENT;
         }
     }
 }
