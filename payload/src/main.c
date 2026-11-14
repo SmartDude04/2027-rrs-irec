@@ -2,6 +2,8 @@
 #include "usb_serial.h"
 #include "tmp119.h"
 #include "I2C_DMA.h"
+#include "ICM.h"
+#include "mpr.h"
 #include "gpio.h"
 #include "lora_sx1276.h"
 #include "SPI.h"
@@ -9,13 +11,15 @@
 #include "sdio.h"
 #include "fatfs.h"
 
-
 void SystemClock_Config();
 void Error_Handler();
+void gpio_init();
 void SDIO_SDCard_Test();
 
-// I2C_HandleTypeDef hi2c1;
-// struct tmp119 temp_sensor;
+I2C_HandleTypeDef hi2c1;
+struct tmp119 temp_sensor;
+struct ICM icm_sensor;
+MPR_Data mprSensor;
 
 lora_sx1276 lora = {
 	.frequency = 433000000,
@@ -54,9 +58,15 @@ int main() {
     SystemClock_Config();
     LED_Init();
     MX_USB_DEVICE_Init();
-	MX_SDIO_SD_Init();
-	MX_FATFS_Init();
-	SPI_Init();
+    MX_SDIO_SD_Init();
+    MX_FATFS_Init();
+    SPI_Init();
+    I2C_Init(&hi2c1);
+	gpio_init();
+
+	SerialWrite("Starting ICM-20948 test...\n");
+	HAL_Delay(2000);
+	ICM_init(&icm_sensor);
 	radio_link_init(&lora, &link, NODE_PAYLOAD);
 	HAL_Delay(5000);
     I2C_Init(&hi2c1);     // From merge conflict

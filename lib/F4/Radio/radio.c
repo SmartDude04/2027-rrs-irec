@@ -1,7 +1,7 @@
 #include "radio.h"
 
 uint8_t radio_checkin(struct radio_link *link, uint8_t destination) {
-    if (!radio_link_send(link, destination, MSG_HEARTBEAT, NULL, 0)) {
+    if (radio_link_send(link, destination, MSG_HEARTBEAT, NULL, 0) != RADIO_OK) {
         return COMM_TX_FAILED;
     }
     return COMM_OK;
@@ -22,14 +22,15 @@ uint8_t radio_request_data(struct radio_link *link, uint8_t destination) {
 }
 
 void radio_rx_process(struct radio_link *link) {
+    radio_link_receive(link);
     struct protocol_packet rx_packet = {0};
     while(radio_link_message_available(link)) { // Go through queue
         radio_link_get_message(link, &rx_packet); // Get first message off queue
-
         switch (rx_packet.message_type)
         {
             case MSG_HEARTBEAT:
                 // Could have it send back radio stats
+                radio_flag = MSG_HEARTBEAT;
                 radio_link_send(link, rx_packet.source, MSG_HEARTBEAT_ACK, NULL, 0);
                 break;
             case MSG_HEARTBEAT_ACK:
@@ -42,7 +43,7 @@ void radio_rx_process(struct radio_link *link) {
                 radio_link_send(link, rx_packet.source, MSG_COMMAND_ACK, NULL, 0);
                 break;
             case MSG_COMMAND_ACK:
-                command_status = rx_packet.data;
+                // command_status = rx_packet.data;
                 // The data shold be of type command_ack
                 // Check which one it was and save to radio_status
                 break;
