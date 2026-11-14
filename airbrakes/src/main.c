@@ -10,7 +10,7 @@
 #include "MPRLS_PRESSURE.h"
 #include "finite_state_machine.h"
 #include "kalman.h"
-#include "airbrake_apogee.h"
+#include "gradient.h"
 
 void DWT_Init(void);
 
@@ -62,9 +62,19 @@ int main(void)
         // continue;
         
         HAL_Delay(3000);
-        uint16_t apogee_index;
-        USB_CDC_PRINTF("Predicted apogee: %f last index: %d\n", apogee_from_airbrakes(airbrake_state, &apogee_index, 252.0f, 144.29f, 1.0f), apogee_index);
-        
+        for (int i = 0; i < QP_STATE_SIZE; ++i)
+        {
+            airbrake_state[i] = 1.0f;
+        }
+        float gradient[QP_STATE_SIZE];
+        airbrake_state_gradient(airbrake_state, gradient, 252.0f, 144.29f, 1.0f);
+        USB_CDC_PRINTF("Gradient:\n");
+        HAL_Delay(5);
+        for (int i = 0; i < QP_STATE_SIZE; ++i)
+        {
+            USB_CDC_PRINTF("%f\n", gradient[i]);
+            HAL_Delay(2);
+        }
         continue;
         
         switch (airbrakes_state)
