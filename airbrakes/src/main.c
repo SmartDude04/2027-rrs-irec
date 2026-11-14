@@ -10,7 +10,7 @@
 #include "MPRLS_PRESSURE.h"
 #include "finite_state_machine.h"
 #include "kalman.h"
-#include "../lib/dynamics/airbrake_apogee.h"
+#include "airbrake_apogee.h"
 
 void DWT_Init(void);
 
@@ -24,6 +24,7 @@ volatile float cur_altitude_meters;
 volatile float cur_air_density_kg_m_cubed;
 volatile float cur_speed_of_sound_meters_per_second;
 volatile IMU_Data cur_imu_data;
+volatile float cur_vertical_acceleration;
 
 static volatile uint8_t new_pressure = 0;
 static volatile uint8_t new_imu = 0;
@@ -168,9 +169,7 @@ static void run_kalman()
         // Do not update during the boost phase; the model is not built for that
         if (airbrakes_state == COAST || airbrakes_state == CONTROL)
         {
-            const float acceleration_vertical = cur_imu_data.acceleration_z_meters_per_second_squared;
-
-            ekf_update_acceleration(acceleration_vertical, airbrake_state[0]);
+            ekf_update_acceleration(cur_vertical_acceleration, airbrake_state[0]);
         }
 
         new_imu = 0;
@@ -231,6 +230,8 @@ static void run_imu()
     if (imu_status == IMU_DATA_READY)
     {
         cur_imu_data = imu_data_from_rx_buffer();
+        // TODO: Confirm this or use trig to get a tilted version
+        cur_vertical_acceleration = cur_imu_data.acceleration_z_meters_per_second_squared;
         new_imu = 1;
         imu_status = IMU_IDLE;
     }
