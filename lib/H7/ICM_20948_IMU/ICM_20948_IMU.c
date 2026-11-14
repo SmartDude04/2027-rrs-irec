@@ -10,8 +10,14 @@
 #define GYRO_CONFIG_BANK_2 0x01
 #define ACCEL_XOUT_H 0x2D
 
-uint8_t icm_20948_rx_buffer[12] = {0};
-IMU_STATUS imu_status = IMU_UNINITIALIZED;
+#define ACCEL_SENSITIVITY 2048.0f
+#define GYRO_SENSITIVITY 131.0f
+#define ACCELERATION_GRAVITY_MS2 9.80665f
+#define TEMPERATURE_SENSITIVITY 333.87f
+#define ROOM_TEMP_OFFSET 21.0f
+
+uint8_t volatile icm_20948_rx_buffer[14] = {0};
+IMU_STATUS volatile imu_status = IMU_UNINITIALIZED;
 
 static TIM_HandleTypeDef tim4_handle;
 HAL_StatusTypeDef tim4_init();
@@ -48,12 +54,14 @@ HAL_StatusTypeDef imu_init()
     status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, REG_BANK_SEL, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00100000}, 1, 1000);
     if (status != HAL_OK) { return status; }
     
-    // Set acceleration limit to plus.minus 8G
-    status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, ACCEL_CONFIG_BANK_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00000100, 0x00}, 2, 1000);
+    // Set acceleration limit to plus.minus 16 G
+    // Additionally enable the low pass filter that will be good for just above 100 Hz
+    status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, ACCEL_CONFIG_BANK_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00010111, 0x00}, 2, 1000);
     if (status != HAL_OK) { return status; }
     
-    // Set gyro limit to plus.minus 1000 dps
-    status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, GYRO_CONFIG_BANK_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00000100, 0x00}, 2, 1000);
+    // Set gyro limit to plus.minus 250 dps
+    // Additionally enable the low pass filte that will be good for just above 100 Hz
+    status = HAL_I2C_Mem_Write(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, GYRO_CONFIG_BANK_2, I2C_MEMADD_SIZE_8BIT, (uint8_t[]){0b00010001, 0x00}, 2, 1000);
     if (status != HAL_OK) { return status; }
     
     // Switch back to bank 0
@@ -96,11 +104,17 @@ HAL_StatusTypeDef tim4_init()
 
 HAL_StatusTypeDef read_acceleration_gyro()
 {
-    i2c2_handle.Devaddress = ICM_20948_I2C_ADDRESS << 1;
-    const HAL_StatusTypeDef ret = HAL_I2C_Mem_Read_DMA(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, ACCEL_XOUT_H, I2C_MEMADD_SIZE_8BIT, icm_20948_rx_buffer, sizeof(icm_20948_rx_buffer));
-    if (ret == HAL_OK)
+    if (imu_status != IMU_MAKE_MEASUREMENT)
     {
-        imu_status = IMU_RX_PENDING;
+        return HAL_ERROR;
+    }
+    
+    i2c2_handle.Devaddress = ICM_20948_I2C_ADDRESS << 1;
+    imu_status = IMU_RX_PENDING;
+    const HAL_StatusTypeDef ret = HAL_I2C_Mem_Read_DMA(&i2c2_handle, ICM_20948_I2C_ADDRESS << 1, ACCEL_XOUT_H, I2C_MEMADD_SIZE_8BIT, (uint8_t *) icm_20948_rx_buffer, sizeof(icm_20948_rx_buffer));
+    if (ret != HAL_OK)
+    {
+        imu_status = IMU_MAKE_MEASUREMENT;
     }
     return ret;
 }
@@ -115,17 +129,24 @@ IMU_Data imu_data_from_rx_buffer()
     const int16_t raw_gyro_x = (int16_t)(((uint16_t) icm_20948_rx_buffer[6] << 8) + icm_20948_rx_buffer[7]);
     const int16_t raw_gyro_y = (int16_t)(((uint16_t) icm_20948_rx_buffer[8] << 8) + icm_20948_rx_buffer[9]);
     const int16_t raw_gyro_z = (int16_t)(((uint16_t) icm_20948_rx_buffer[10] << 8) + icm_20948_rx_buffer[11]);
+    const int16_t raw_temp_celsius = (int16_t)(((uint16_t) icm_20948_rx_buffer[12] << 8) + icm_20948_rx_buffer[13]);
     
-    // Raw is converted using conversion from sections 3.1 and 3.2
+    // Raw is converted using conversion from sections 3.1 and 3.2 and 3.4
     // https://cdn.sparkfun.com/assets/7/f/e/c/d/DS-000189-ICM-20948-v1.3.pdf
-    data.acceleration_x_meters_per_second_squared = 9.80665 * ((double) raw_accel_x) / 4096.0;
-    data.acceleration_y_meters_per_second_squared = 9.80665 * ((double) raw_accel_y) / 4096.0;
-    data.acceleration_z_meters_per_second_squared = 9.80665 * ((double) raw_accel_z) / 4096.0;
-    data.gyro_x_degrees_per_second = ((double) raw_gyro_x) / 32.8;
-    data.gyro_y_degrees_per_second = ((double) raw_gyro_y) / 32.8;
-    data.gyro_z_degrees_per_second = ((double) raw_gyro_z) / 32.8;
+    data.acceleration_x_meters_per_second_squared = ACCELERATION_GRAVITY_MS2 * ((float) raw_accel_x) / ACCEL_SENSITIVITY;
+    data.acceleration_y_meters_per_second_squared = ACCELERATION_GRAVITY_MS2 * ((float) raw_accel_y) / ACCEL_SENSITIVITY;
+    data.acceleration_z_meters_per_second_squared = ACCELERATION_GRAVITY_MS2 * ((float) raw_accel_z) / ACCEL_SENSITIVITY;
+    data.gyro_x_degrees_per_second = ((float) raw_gyro_x) / GYRO_SENSITIVITY;
+    data.gyro_y_degrees_per_second = ((float) raw_gyro_y) / GYRO_SENSITIVITY;
+    data.gyro_z_degrees_per_second = ((float) raw_gyro_z) / GYRO_SENSITIVITY;
+    data.temperature_celsius = ((float) raw_temp_celsius) / TEMPERATURE_SENSITIVITY + ROOM_TEMP_OFFSET;
     
     return data;
+}
+
+float celsius_to_kelvin(const float temperature_celsius)
+{
+    return temperature_celsius + 273.15f;
 }
 
 void TIM4_IRQHandler(void)

@@ -6,7 +6,7 @@
 #include "stm32h7xx_hal.h"
 
 #define MPRLS_PRESSURE_I2C_ADDRESS 0x18
-#define LAUNCH_SITE_ALTITUDE_ABOVE_SEA_LEVEL 0
+#define LAUNCH_PRESSURE_HPA 1013.25f
 
 typedef enum
 {
@@ -19,11 +19,9 @@ typedef enum
     MPRLS_DATA_READY // I2C request is complete and data is in *mprls_pressure_rx_buffer
 } MPRLS_STATUS;
 
-extern MPRLS_STATUS mprls_status;
+extern volatile MPRLS_STATUS mprls_status;
 
-extern double mprls_pressure_hpa;
-extern double mprls_altitude_meters;
-extern uint8_t mprls_pressure_rx_buffer[4];
+extern uint8_t volatile mprls_pressure_rx_buffer[4];
 
 /**
  * Initializes the MPRLS pressure sensor. Specifically, sets PB8 as input to be called when data is ready
@@ -52,19 +50,37 @@ HAL_StatusTypeDef start_mprls_dma_read();
  * Using data in mprls_pressure_rx_buffer, returns the pressure in PSI
  * @return The pressure, in PSI
  */
-double pressure_psi_from_rx_buffer();
+float pressure_psi_from_rx_buffer();
 
 /**
  * Converts the pressure in PSI to hPa
  */
-double pressure_psi_to_hpa(double pressure_psi);
+float pressure_to_hpa(float pressure_psi);
 
 /**
  * Converts a pressure reading to a relative altitude above the ground
  * 
- * @param ground_height_above_sea_level Height, in meters, of the launch site above sea level
+ * @param pressure_hpa Height, in meters, of the launch site above sea level
  * @return Altitude of the rocket above the launch site, in meters
  */
-double pressure_hpa_to_altitude_meters(double ground_height_above_sea_level);
+float altitude_meters(float pressure_hpa);
+
+/**
+ * Converts a pressure and temperature reading to an estimated air density
+ * 
+ * @param altitude_meters Altitude, in meters, above sea level
+ * @return Estimated air density in kilograms per meter cubed
+ */
+float air_density_kg_per_meter_cubed(float altitude_meters);
+
+/**
+ * Converts a pressure and air density reading to a speed of sound estimated
+ * 
+ * @param pressure_hpa Pressure of the air, in hectopascals
+ * @param density_kg_meters_cubed Air density in kilograms per meter cubed
+ * @return The current estimated speed of sound
+ */
+float speed_of_sound_meters_per_second(float pressure_hpa, float density_kg_meters_cubed);
+
 
 #endif

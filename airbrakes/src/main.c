@@ -7,23 +7,46 @@
 #include "I2C_DMA.h"
 #include "ICM_20948_IMU.h"
 #include "MPRLS_PRESSURE.h"
+#include "finite_state_machine.h"
+#include "../lib/kalman/kalman.h"
 
+static void run_kalman();
 static void run_mprls();
 static void run_imu();
 
+volatile float cur_pressure_hpa;
+volatile float cur_altitude_meters;
+volatile float cur_air_density_kg_m_cubed;
+volatile float cur_speed_of_sound_meters_per_second;
+volatile IMU_Data cur_imu_data;
+
 static volatile uint8_t new_pressure = 0;
 static volatile uint8_t new_imu = 0;
-static volatile double pressure_hpa;
-static volatile double altitude_m;
-static volatile IMU_Data imu_data;
+static uint8_t kalman_initialized = 0;
+
+static volatile float airbrake_active_area = 0;
+static uint32_t cycle_count_at_last_predict;
+
+Airbrakes_Finite_State_Machine airbrakes_state = DISARMED;
+
+void DWT_Init(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+
+    DWT->CYCCNT = 0;
+
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
 
 int main(void)
 {
+    // TODO: Add better error handling all around, and especially in init functions
     HAL_Init();
     USB_CDC_INIT();
     Servo_Init_TIM3_PA6();
     I2C_DMA_Init();
     mprls_init();
+    DWT_Init();
     const HAL_StatusTypeDef imu_init_status = imu_init();
     if (imu_init_status != HAL_OK)
     {
@@ -31,42 +54,84 @@ int main(void)
         USB_CDC_PRINTF("Failed to initialize IMU: Failed with code %d\n", imu_init_status);
         while (1);
     }
-    
+       
+    HAL_Delay(3000);
     
     while (1)
     {
         // Servo_Move_Degrees(0);
         // HAL_Delay(1000);
-        // Servo_Move_Degrees(70);
+        // Servo_Move_Degrees(30);
         // HAL_Delay(1000);
         // continue;
+        
         run_mprls();
         run_imu();
+        run_kalman();
         
-        if (new_pressure)
-        {
-            HAL_Delay(10);
-            USB_CDC_PRINTF("Pressure (hPa): %lf\tAltitude (m): %lf\n", pressure_hpa, altitude_m);
-            new_pressure = 0;
-        }
-        if (new_imu)
-        {
-            HAL_Delay(10);
-            USB_CDC_PRINTF("ax: %lf ay: %lf ax: %lf gx %lf gy %lf gz %lf\n",
-                imu_data.acceleration_x_meters_per_second_squared,
-                imu_data.acceleration_y_meters_per_second_squared,
-                imu_data.acceleration_z_meters_per_second_squared,
-                imu_data.gyro_x_degrees_per_second,
-                imu_data.gyro_y_degrees_per_second,
-                imu_data.gyro_z_degrees_per_second);
-            new_imu = 0;
-        }
-        
-        HAL_Delay(1);
+        USB_CDC_PRINTF("altitude: %f\t velocity: %f\t theta: %f\n", ekf_state.altitude, ekf_state.velocity, ekf_state.theta);
     }
 }
 
-void run_mprls()
+static void run_kalman()
+{
+    if (!kalman_initialized)
+    {
+        if (new_imu && new_pressure)
+        {
+            ekf_init(cur_altitude_meters, 0.0f);
+            kalman_initialized = 1;
+            cycle_count_at_last_predict = DWT->CYCCNT;
+
+            new_imu = 0;
+            new_pressure = 0;
+        }
+        
+        return;
+    }
+
+    const uint32_t prev_cycle_count = cycle_count_at_last_predict;
+    cycle_count_at_last_predict = DWT->CYCCNT;
+
+    // Before launch, track the barometer without predicting a falling rocket.
+    // This is because the EKF does not predict state on the pad
+    if (airbrakes_state == DISARMED || airbrakes_state == PRE_LAUNCH)
+    {
+        if (new_pressure)
+        {
+            ekf_init(cur_altitude_meters, 0.0f);
+            new_pressure = 0;
+        }
+
+        new_imu = 0;
+        return;
+    }
+
+    const float time_since_last_predict = (float) (cycle_count_at_last_predict - prev_cycle_count) / (float) SystemCoreClock;
+
+    ekf_predict(airbrake_active_area, time_since_last_predict);
+
+    if (new_imu)
+    {
+        // Do not update during the boost phase; the model is not built for that
+        if (airbrakes_state == COAST || airbrakes_state == CONTROL)
+        {
+            const float acceleration_vertical = cur_imu_data.acceleration_z_meters_per_second_squared;
+
+            ekf_update_acceleration(acceleration_vertical, airbrake_active_area);
+        }
+
+        new_imu = 0;
+    }
+
+    if (new_pressure)
+    {
+        ekf_update_barometer(cur_altitude_meters);
+        new_pressure = 0;
+    }
+}
+
+static void run_mprls()
 {
     if (mprls_status == MPRLS_IDLE)
     {
@@ -90,16 +155,19 @@ void run_mprls()
     }
     if (mprls_status == MPRLS_DATA_READY)
     {
-        pressure_hpa = pressure_psi_to_hpa(pressure_psi_from_rx_buffer());
-        altitude_m = pressure_hpa_to_altitude_meters(pressure_hpa);
+        cur_pressure_hpa = pressure_to_hpa(pressure_psi_from_rx_buffer());
+        cur_altitude_meters = altitude_meters(cur_pressure_hpa);
+        cur_air_density_kg_m_cubed = air_density_kg_per_meter_cubed(cur_altitude_meters);
+        cur_speed_of_sound_meters_per_second = speed_of_sound_meters_per_second(cur_pressure_hpa, cur_air_density_kg_m_cubed);
+        
         new_pressure = 1;
         mprls_status = MPRLS_IDLE;
     }
 }
 
-void run_imu()
+static void run_imu()
 {
-    if (imu_status == IMU_IDLE)
+    if (imu_status == IMU_MAKE_MEASUREMENT)
     {
         const HAL_StatusTypeDef ret = read_acceleration_gyro();
         if (ret != HAL_OK)
@@ -110,77 +178,8 @@ void run_imu()
     }
     if (imu_status == IMU_DATA_READY)
     {
-        imu_data = imu_data_from_rx_buffer();
+        cur_imu_data = imu_data_from_rx_buffer();
         new_imu = 1;
-    }
-}
-
-/**
- * Called when a write is finished from HAL_I2C_Master_Transmit_DMA()
- */
-void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
-{
-    if (hi2c->Devaddress == MPRLS_PRESSURE_I2C_ADDRESS << 1)
-    {
-        if (mprls_status == MPRLS_TX_PENDING)
-        {
-            mprls_status = MPRLS_MEASURING;
-        }
-    }
-}
-
-/**
- * Called when DMA memory is ready from HAL_I2C_Master_Receive_DMA() read
- */
-void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
-{
-    if (hi2c == &i2c1_handle && hi2c->Devaddress == MPRLS_PRESSURE_I2C_ADDRESS << 1)
-    {
-        if (mprls_status == MPRLS_RX_PENDING)
-        {
-            mprls_status = MPRLS_DATA_READY;
-        }
-    }
-}
-
-/**
- * Called when DMA memory is ready from HAL_I2C_Mem_Read_DMA() read
- */
-void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
-{
-    if (hi2c == &i2c2_handle && hi2c->Devaddress == ICM_20948_I2C_ADDRESS << 1)
-    {
-        if (imu_status == IMU_RX_PENDING)
-        {
-            imu_status = IMU_DATA_READY;
-        }
-    }
-}
-
-/**
- * Called during GPIO interrupt
- */
-void HAL_GPIO_EXTI_Callback(const uint16_t GPIO_Pin)
-{
-    if (GPIO_Pin == GPIO_PIN_8)
-    {
-        if (mprls_status == MPRLS_MEASURING)
-        {
-            mprls_status = MPRLS_MEASURED;
-        }
-    }
-}
-
-/**
- * Called when a timer interrupt is set to fire
- */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-    if (htim->Instance == TIM4)
-    {
-        if (imu_status == IMU_DATA_READY)
-        {
-            imu_status = IMU_IDLE;
-        }
+        imu_status = IMU_IDLE;
     }
 }
