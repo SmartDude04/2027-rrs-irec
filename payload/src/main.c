@@ -18,11 +18,15 @@
 void SystemClock_Config();
 void Error_Handler();
 void gpio_init();
-
+void exponentialFilter(float input, float *previous, double alpha);
+bool sensorReadWrite(void);
+float getAltFromLaunchM(float currentAltPSI);
+float mtoft(float meters);
+float psiToM(float psi);
+float calibrateOffsetPSI(float knownAltM, int CAL_NUM_READS, double alpha);
 I2C_HandleTypeDef hi2c2;
 
-struct ICM icm_sensor;
-MPR_Data mprSensor;
+
 lora_sx1276 lora = {
 	.frequency = 433000000,
 	.nss_pin = GPIO_PIN_2,
@@ -39,11 +43,25 @@ lora_sx1276 lora = {
 	.rx_frequency_offset = 0,
 	.spi_timeout = LORA_DEFAULT_SPI_TIMEOUT};
 struct radio_link link;
+
+struct ICM icm_sensor;
+MPR_Data mprSensor;
 struct tmp119 temp_sensor1;
 struct tmp119 temp_sensor2;
+float prevPressure = -9999.0f;
+double minPressureSeen = 999.0;
+double maxPressureSeen = 0.0;
+double alpha = .35;
+const uint32_t SENSOR_TIMEOUT_MS = 20;
+const uint32_t RECOVERY_INTERVAL_MS = 3000;
+uint32_t SENSOR_ERROR[5] = {0}; // accel, gyro, temp1, temp2, mpr
+double LAUNCH_ALTITUDE_M = 67.0;
+double APOGEE_SEARCH_ALTITUDE_M = 800.0;
+float offsetPSI =0;
 float filteredAccel[3] = {-9999.0f, -9999.0f, -9999.0f};
 float filteredGyro[3] = {-9999.0f, -9999.0f, -9999.0f};
 float filteredTemp[2] = {-9999.0f, -9999.0f};
+
 enum STATE
 {
 	IDLE,
@@ -60,7 +78,7 @@ const char *stateNames[] = {
 	"RECOVERY"};
 enum STATE activeState;
 bool stateChangeComplete = false;
-float prevPressure = -9999.0f;
+
 uint32_t ascentStart = 0;
 uint32_t descentStart = 0;
 uint32_t recoveryRead = 0;
@@ -68,10 +86,7 @@ uint32_t timeLastSync = 0;
 int descentCounter = 0;
 int ascentCounter = 0;
 int recoverycount = 0;
-double minPressureSeen = 999.0;
-double maxPressureSeen = 0.0;
-void exponentialFilter(float input, float *previous, double alpha);
-double alpha = 0;
+
 FATFS FatFs;
 FIL Fil;
 FRESULT FR_Status;
@@ -81,15 +96,7 @@ FILINFO fno;
 char radioPayload[320];
 uint8_t radio_len = 0;
 bool ARM_FLAG = true;
-const uint32_t SENSOR_TIMEOUT_MS = 20;
-const uint32_t RECOVERY_INTERVAL_MS = 3000;
-uint32_t SENSOR_ERROR[5] = {0}; // accel, gyro, temp1, temp2, mpr
-double LAUNCH_ALTITUDE_M = 0.0;
-double APOGEE_SEARCH_ALTITUDE_M = 800.0;
-bool sensorReadWrite(void);
-float getAltFromLaunchM(float currentAltPSI);
-float mtoft(float meters);
-float psiToM(float psi);
+
 int main()
 {
 	activeState = IDLE;
@@ -101,7 +108,6 @@ int main()
 	MX_USB_DEVICE_Init();
 	MX_SDIO_SD_Init();
 	MX_FATFS_Init();
-	HAL_Delay(2000);
 	radio_link_init(&lora, &link, NODE_PAYLOAD);
 	lora_mode_receive_continuous(&lora);
 	HAL_Delay(1000);
@@ -111,12 +117,22 @@ int main()
 	FR_Status = f_mount(&FatFs, SDPath, 0);
 	if (FR_Status != FR_OK)
 	{
-		SerialWrite("Error! While Mounting SD Card 0 , Error Code: (%i)\r\n", FR_Status);
+		while(1){	
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+		HAL_Delay(100);
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+		HAL_Delay(500);
+		}
 	}
 	FR_Status = f_mount(&FatFs, SDPath, 1);
 	if (FR_Status != FR_OK)
 	{
-		SerialWrite("Error! While Mounting SD Card 1, Error Code: (%i)\r\n", FR_Status);
+		while(1){	
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+		HAL_Delay(100);
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+		HAL_Delay(500);
+		}
 	}
 	for (int i = 0; i < 1000; i++)
 	{
@@ -125,7 +141,6 @@ int main()
 			break;
 	}
 	FR_Status = f_open(&Fil, filename, FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
-	SerialWrite("SD card mounted and file %s opened for writing\n", filename);
 	while (1)
 	{
 
@@ -143,10 +158,9 @@ int main()
 				// mpr is low power by default when not reading
 				stateChangeComplete = true;
 			}
-			SerialWrite("IDLE, Current Tick: %u \n", HAL_GetTick());
 			// broken by radio command to "ARM" - switch to case ARMED
 			// all but radio off
-			if (ARM_FLAG) // TODO: PUT RADIO TRIGGER HERE
+			if (ARM_FLAG) 
 			{
 				stateChangeComplete = false;
 				activeState = ARMED;
@@ -162,8 +176,9 @@ int main()
 		case ARMED:
 			if (!stateChangeComplete)
 			{
+				offsetPSI = calibrateOffsetPSI(LAUNCH_ALTITUDE_M, 100, alpha);
 				f_sync(&Fil);
-				alpha = .9;
+				//alpha = .75;
 				TMP119_SetLowPower(&temp_sensor1, false);
 				TMP119_SetLowPower(&temp_sensor2, false);
 				ICM_setLowPower(false);
@@ -202,7 +217,7 @@ int main()
 			{
 				ascentStart = HAL_GetTick();
 				f_sync(&Fil);
-				alpha = .9;
+				//alpha = .75;
 				TMP119_SetLowPower(&temp_sensor1, false);
 				TMP119_SetLowPower(&temp_sensor2, false);
 				ICM_setLowPower(false);
@@ -241,6 +256,7 @@ int main()
 			{
 				descentStart = HAL_GetTick();
 				f_sync(&Fil);
+				//alpha = .75;
 				stateChangeComplete = true;
 			}
 			sensorReadWrite();
@@ -251,7 +267,6 @@ int main()
 				activeState = RECOVERY;
 			}
 
-			SerialWrite("descent\n");
 			break;
 		case RECOVERY:
 			if (!stateChangeComplete)
@@ -271,10 +286,12 @@ int main()
 		if (radio_flag == MSG_TELEMETRY)
 		{
 			radio_link_send(&link, NODE_GROUND_STATION, MSG_TELEMETRY, (uint8_t *)radioPayload, radio_len);
+			radio_flag = 0;
 		}
 		if (radio_flag == MSG_COMMAND_ARM)
 		{
 			ARM_FLAG = true;
+			radio_flag = 0;
 		}
 		HAL_Delay(10);
 	}
@@ -306,75 +323,7 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 	}
 }
 
-void gpio_init()
-{
-	__HAL_RCC_GPIOC_CLK_ENABLE();
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = GPIO_PIN_13;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-}
 
-/**
- * @brief System Clock Configuration
- * @retval None
- */
-void SystemClock_Config(void)
-{
-	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-	/** Configure the main internal regulator output voltage
-	 */
-	__HAL_RCC_PWR_CLK_ENABLE();
-	__HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-
-	/** Initializes the RCC Oscillators according to the specified parameters
-	 * in the RCC_OscInitTypeDef structure.
-	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-	RCC_OscInitStruct.PLL.PLLM = 25;
-	RCC_OscInitStruct.PLL.PLLN = 192;
-	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-	RCC_OscInitStruct.PLL.PLLQ = 4;
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-	{
-		Error_Handler();
-	}
-
-	/** Initializes the CPU, AHB and APB buses clocks
-	 */
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
-	{
-		Error_Handler();
-	}
-}
-
-/**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
- */
-void Error_Handler(void)
-{
-	/* USER CODE BEGIN Error_Handler_Debug */
-	/* User can add his own implementation to report the HAL error return state */
-	__disable_irq();
-	while (1)
-	{
-	}
-	/* USER CODE END Error_Handler_Debug */
-}
 void exponentialFilter(float input, float *previous, double alpha)
 {
 	if (*previous == -9999.0f)
@@ -521,6 +470,7 @@ bool sensorReadWrite(void)
 			if (altN > 0)
 				pos += altN;
 		}
+	}
 		for (int i = 0; i < 9 && pos < (int)sizeof(line) - 1; i++)
 		{
 			int n;
@@ -590,10 +540,94 @@ bool sensorReadWrite(void)
 		return meters * 3.28084;
 	}
 	float psiToM(float psi)
+{
+    if (!(psi > 0.0f && psi < 20.0f)) return NAN;
+    return (1.0f - powf(psi / offsetPSI, 0.190284f)) * 44307.69f;
+}
+	float calibrateOffsetPSI(float knownAltM, int CAL_NUM_READS, double alpha)
+{
+	for (int i = 0; i < CAL_NUM_READS; i++)
 	{
-		if (!(psi > 0.0f && psi < 20.0f))
-		{
-			return NAN;
-		}
-		return (1 - powf((psi / 14.696), 0.190284)) * 145366.45 * 0.3048;
+		MPR_Read(&mprSensor);
+		while (mprSensor.busy)
+			;
+
+		if (i == 0)
+			prevPressure = mprSensor.pressure; // seed so the filter doesn't ramp from a stale value
+		else
+			exponentialFilter(mprSensor.pressure, &prevPressure, alpha);
 	}
+
+	return prevPressure / powf(1.0f - knownAltM / 44307.69f, 5.2553f);
+}
+
+
+	void gpio_init()
+{
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	GPIO_InitStruct.Pin = GPIO_PIN_13;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+}
+
+/**
+ * @brief System Clock Configuration
+ * @retval None
+ */
+void SystemClock_Config(void)
+{
+	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+	/** Configure the main internal regulator output voltage
+	 */
+	__HAL_RCC_PWR_CLK_ENABLE();
+	__HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+	/** Initializes the RCC Oscillators according to the specified parameters
+	 * in the RCC_OscInitTypeDef structure.
+	 */
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+	RCC_OscInitStruct.PLL.PLLM = 25;
+	RCC_OscInitStruct.PLL.PLLN = 192;
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+	RCC_OscInitStruct.PLL.PLLQ = 4;
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	/** Initializes the CPU, AHB and APB buses clocks
+	 */
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
+	{
+		Error_Handler();
+	}
+}
+
+/**
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
+void Error_Handler(void)
+{
+	/* USER CODE BEGIN Error_Handler_Debug */
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1)
+	{
+	}
+	/* USER CODE END Error_Handler_Debug */
+}
