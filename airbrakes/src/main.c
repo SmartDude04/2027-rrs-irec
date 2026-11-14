@@ -67,31 +67,9 @@ int main(void)
         
         run_mprls();
         run_imu();
-        
         run_kalman();
         
         USB_CDC_PRINTF("altitude: %f\t velocity: %f\t theta: %f\n", ekf_state.altitude, ekf_state.velocity, ekf_state.theta);
-        // if (new_pressure)
-        // {
-        //     HAL_Delay(10);
-        //     USB_CDC_PRINTF("Pressure (hPa): %lf\tAltitude (m): %lf\t Air density (kg/m^3): %lf\t Speed of sound (m/s): %lf\n", cur_pressure_hpa, cur_altitude_meters, cur_air_density_kg_m_cubed, cur_speed_of_sound_meters_per_second);
-        //     new_pressure = 0;
-        // }
-        // if (new_imu)
-        // {
-        //     HAL_Delay(10);
-        //     USB_CDC_PRINTF("ax: %lf ay: %lf ax: %lf gx %lf gy %lf gz %lf temp: %lf\n",
-        //         cur_imu_data.acceleration_x_meters_per_second_squared,
-        //         cur_imu_data.acceleration_y_meters_per_second_squared,
-        //         cur_imu_data.acceleration_z_meters_per_second_squared,
-        //         cur_imu_data.gyro_x_degrees_per_second,
-        //         cur_imu_data.gyro_y_degrees_per_second,
-        //         cur_imu_data.gyro_z_degrees_per_second,
-        //         cur_imu_data.temperature_celsius);
-        //     new_imu = 0;
-        // }
-        //
-        // HAL_Delay(1);
     }
 }
 
