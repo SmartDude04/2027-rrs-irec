@@ -1,0 +1,66 @@
+#include "osqp.h"
+#include "workspace.h"
+
+// int main(void) {
+//     // 1. Core initialization (HAL, Clocks, Caches)
+//     HAL_Init();
+//     SystemClock_Config();
+//     SCB_EnableICache();
+//     SCB_EnableDCache();
+
+//     while (1) {
+//         // 2. (Optional) Dynamically update vectors from sensors or control loops
+//         // osqp_update_lin_cost(&workspace, new_q);
+//         // osqp_update_bounds(&workspace, new_l, new_u);
+
+//         // 3. Solve the QP problem
+//         osqp_solve(&workspace);
+
+//         // 4. Extract the solution array
+//         double *solution = workspace.x;
+
+//         // Apply your control signals here...
+//         HAL_Delay(10);
+//     }
+// }
+
+int main(void) {
+    // 1. Initialize MCU, System Clocks, FPU...
+    HAL_Init();
+    SystemClock_Config();
+
+    // 2. (Optional) Warm-start or update vectors before solving
+    // If tracking a dynamic target or moving constraints:
+    // osqp_update_linear_cost(&workspace, new_q);
+    // osqp_update_bounds(&workspace, new_l, new_u);
+
+    // 3. Solve the Optimization Problem
+    // c_int exitflag = osqp_solve(&workspace);
+
+    // if (exitflag == 0) {
+    //     // Optimization successful!
+    //     // Extract solutions:
+    //     c_float *primal_solution = workspace.solution->x;
+    //     c_float *dual_solution = workspace.solution->y;
+
+    //     // Apply primal_solution to your actuators/motors here...
+    // } else {
+    //     // Error handling (e.g., problem infeasible)
+    // }
+
+    // while (1) {
+    //     // Control Loop
+    // }
+
+    osqp_update_linear_cost(&workspace, new_q); // <-- IF the function signature asks for it
+
+    // 2. Solve the problem
+    // For codegen, the solve function usually targets the globally generated workspace directly:
+    c_int exitflag = osqp_solve(&workspace);
+
+    if (exitflag == 0) {
+        // Accessing the results is done via the global structure:
+        c_float *primal_solution = workspace.solution->x;
+    }
+}
+

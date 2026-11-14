@@ -2,6 +2,8 @@
 #include "usb_serial.h"
 #include "tmp119.h"
 #include "I2C_DMA.h"
+#include "ICM.h"
+#include "mpr.h"
 #include "gpio.h"
 #include "lora_sx1276.h"
 #include "SPI.h"
@@ -9,13 +11,15 @@
 #include "sdio.h"
 #include "fatfs.h"
 
-
 void SystemClock_Config();
 void Error_Handler();
+void gpio_init();
 void SDIO_SDCard_Test();
 
-// I2C_HandleTypeDef hi2c1;
-// struct tmp119 temp_sensor;
+I2C_HandleTypeDef hi2c1;
+struct tmp119 temp_sensor;
+struct ICM icm_sensor;
+MPR_Data mprSensor;
 
 lora_sx1276 lora = {
 	.frequency = 433000000,
@@ -35,12 +39,8 @@ lora_sx1276 lora = {
 };
 struct radio_link link;
 
-uint8_t res;
-uint8_t data = 0;
-struct protocol_packet packet;
-uint8_t buf[LORA_MAX_PACKET_SIZE];
 
-int main() {
+int main() { 
     HAL_Init();
     SystemClock_Config();
     LED_Init();
@@ -48,28 +48,59 @@ int main() {
     MX_SDIO_SD_Init();
     MX_FATFS_Init();
     SPI_Init();
-	HAL_Delay(5000);
-    radio_link_init(&lora, &link, NODE_PAYLOAD);
-	SerialWrite("Payload Start\n");
-    while (1) {
+    I2C_Init(&hi2c1);
+	gpio_init();
 
-		radio_rx_process(&link);
-		// radio_link_receive(&link);
-		// if (radio_link_message_available(&link)) {
-		// 	radio_link_get_message(&link, &packet);
-		// 	if (packet.message_type == MSG_HEARTBEAT) {
-		// 		SerialWrite("Got heartbeat: %u\n", packet.source);
-		// 		if (radio_link_send(&link, NODE_GROUND_STATION, MSG_HEARTBEAT_ACK, NULL, 0) == RADIO_OK) {
-		// 			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		// 		}
-		// 	}
-		// }
-	}
+	SerialWrite("Starting ICM-20948 test...\n");
+	HAL_Delay(2000);
+	ICM_init(&icm_sensor);
+	radio_link_init(&lora, &link, NODE_PAYLOAD);
+	
+    while (1) {
+        if (!icm_sensor.aBusy && !icm_sensor.gBusy) {
+			/* Only start one I2C DMA transfer at a time. */
+			ICM_StartAccel(&icm_sensor);
+        }
+	
+        if (icm_sensor.new_accel_data) {
+			
+			SerialWrite("Accel X: %f Accel Y: %f Accel Z: %f\n",icm_sensor.accelX, icm_sensor.accelY, icm_sensor.accelZ);
+            icm_sensor.new_accel_data = false;
+        }
+		if (icm_sensor.new_gyro_data) {
+			SerialWrite("Gyro X: %f  Gyro Y: %f  Gyro Z: %f\n",icm_sensor.gyroX, icm_sensor.gyroY, icm_sensor.gyroZ);
+			icm_sensor.new_gyro_data = false;
+		}
+        HAL_Delay(500);
+    }
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
     if (hi2c == &hi2c1) {
-    }
+		if (icm_sensor.aBusy) {
+			ICM_GetAccel(&icm_sensor);
+			/* Queue the gyro read after the accel read releases the bus. */
+			if (!icm_sensor.aBusy && !icm_sensor.gBusy) {
+				ICM_StartGyro(&icm_sensor);
+			}
+		} else if (icm_sensor.gBusy) {
+			ICM_GetGyro(&icm_sensor,false);
+			if (!icm_sensor.gBusy && !icm_sensor.aBusy) {
+				ICM_StartAccel(&icm_sensor);
+			}
+		}
+	}
+}
+
+void gpio_init() {
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	GPIO_InitStruct.Pin = GPIO_PIN_13;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 }
 
 /**
