@@ -11,9 +11,12 @@
 #include "finite_state_machine.h"
 #include "kalman.h"
 #include "gradient.h"
+#include "usb_device.h"
+#include "sdmmc.h"
+#include "fatfs.h"
+#include "spi.h"
 
 void DWT_Init(void);
-
 
 static void run_kalman();
 static void run_mprls();
@@ -45,6 +48,9 @@ int main(void)
     I2C_DMA_Init();
     mprls_init();
     DWT_Init();
+    MX_USB_DEVICE_Init();
+    MX_SDMMC1_SD_Init();
+    MX_FATFS_Init();
     const HAL_StatusTypeDef imu_init_status = imu_init();
     if (imu_init_status != HAL_OK)
     {
@@ -247,6 +253,10 @@ static void run_imu()
     }
 }
 
+/**
+ * Initializes a clock counter for microsecond-level accuracy for the EKF filter to tell time elapsed
+ * since last call
+ */
 void DWT_Init(void)
 {
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
