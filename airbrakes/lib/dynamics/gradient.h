@@ -6,7 +6,7 @@
 /**
  * Computes the gradient of the function which maps an airbrake opening amount to an apogee. Used to linearize flight
  * dynamics to plug into the QP solver
- * 
+ *
  * @param airbrake_state List of airbrake active areas, from 0 to 1
  * @param gradient Gradient will be calculated in this array; all existing data will be overridden
  * @param altitude Current altitude, in meters, above the pad
