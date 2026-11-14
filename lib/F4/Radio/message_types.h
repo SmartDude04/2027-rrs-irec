@@ -19,6 +19,7 @@ enum message_type {
 
     MSG_COMMAND         = 0x10,
     MSG_COMMAND_ACK     = 0x11,
+    MSG_COMMAND_ARM     = 0x12,
 
     MSG_ACK             = 0x20,
     MSG_NACK            = 0x21
