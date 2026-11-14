@@ -2,13 +2,10 @@
 
 #include <memory.h>
 
+#include "constants.h"
 #include "airbrake_helper.h"
 #include "MPRLS_PRESSURE.h"
 
-#define ACCELERATION_GRAVITY_MS2 9.80665f
-#define FULLY_EXTENDED_AIRBRAKE_AREA 1.0f
-#define ROCKET_AREA 1.0f
-#define ROCKET_MASS 1.0f
 
 EKF_State ekf_state;
 

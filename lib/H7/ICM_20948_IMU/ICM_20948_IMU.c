@@ -2,6 +2,7 @@
 
 #include "I2C_DMA.h"
 #include "usb_cdc.h"
+#include "constants.h"
 
 #define REG_BANK_SEL 0x7F
 #define PWR_MGMT_1 0x06
@@ -12,7 +13,6 @@
 
 #define ACCEL_SENSITIVITY 2048.0f
 #define GYRO_SENSITIVITY 131.0f
-#define ACCELERATION_GRAVITY_MS2 9.80665f
 #define TEMPERATURE_SENSITIVITY 333.87f
 #define ROOM_TEMP_OFFSET 21.0f
 

@@ -5,6 +5,7 @@
 
 #include "I2C_DMA.h"
 #include "ICM_20948_IMU.h"
+#include "constants.h"
 
 #define STANDARD_TEMPERATURE_KELVIN 288.16f
 #define HEIGHT_TEMP_SCALE_FACTOR 0.0065f
