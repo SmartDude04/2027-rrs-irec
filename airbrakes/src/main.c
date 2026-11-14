@@ -14,6 +14,8 @@
 #include "spi.h"
 #include <stdint.h>
 
+#include "lookup.h"
+
 /* Uses the existing project drivers and board configuration functions.
  * SystemClock_Config, Error_Handler
  * must still be supplied by the project; their bodies were not provided.
@@ -43,7 +45,8 @@ void SDIO_SDCard_Test(void);
 static void run_mprls(void);
 static void run_imu(void);
 void airbrake_start(void);
-void airbrake_tick(float alt_m, float vz_mps);
+// void airbrake_tick(float alt_m, float vz_mps);
+float airbrake_tick(float alt_m, float vz_mps);
 void servo_set_opening(float a);
 
 static uint8_t new_pressure = 0;
@@ -85,45 +88,48 @@ int main(void)
     MX_SDMMC1_SD_Init();
     MX_FATFS_Init();
 
-    HAL_Delay(5000);
-    SDIO_SDCard_Test();
-
     airbrake_start();
     state = WaitingForLaunch;
 
-    while (1)
-    {
-        run_mprls();
-        run_imu();
+    HAL_Delay(10000);
 
-        if (new_pressure)
-        {
-            HAL_Delay(10);
-            USB_CDC_PRINTF("Pressure (raw): %lu\n",
-                           (unsigned long)raw_pressure);
-            new_pressure = 0;
-        }
+    USB_CDC_PRINTF("Beginning test flight...\n");
 
-        if (new_imu)
-        {
-            HAL_Delay(10);
-            USB_CDC_PRINTF("ax: %lf ay: %lf az: %lf gx: %lf gy: %lf gz: %lf\n",
-                           imu_data.acceleration_x_meters_per_second_squared,
-                           imu_data.acceleration_y_meters_per_second_squared,
-                           imu_data.acceleration_z_meters_per_second_squared,
-                           imu_data.gyro_x_degrees_per_second,
-                           imu_data.gyro_y_degrees_per_second,
-                           imu_data.gyro_z_degrees_per_second);
-            new_imu = 0;
-        }
+    test_flight();
 
-        HAL_Delay(1);
+    // while (1)
+    // {
+    //     run_mprls();
+    //     run_imu();
 
-        /* TODO: Convert calibrated pressure to altitude, estimate vertical
-         * velocity and call airbrake_tick only during Coast, at AB_DT_MPC.
-         * The enum alone does not implement flight-state transitions.
-         */
-    }
+    //     if (new_pressure)
+    //     {
+    //         HAL_Delay(10);
+    //         USB_CDC_PRINTF("Pressure (raw): %lu\n",
+    //                        (unsigned long)raw_pressure);
+    //         new_pressure = 0;
+    //     }
+
+    //     if (new_imu)
+    //     {
+    //         HAL_Delay(10);
+    //         USB_CDC_PRINTF("ax: %lf ay: %lf az: %lf gx: %lf gy: %lf gz: %lf\n",
+    //                        imu_data.acceleration_x_meters_per_second_squared,
+    //                        imu_data.acceleration_y_meters_per_second_squared,
+    //                        imu_data.acceleration_z_meters_per_second_squared,
+    //                        imu_data.gyro_x_degrees_per_second,
+    //                        imu_data.gyro_y_degrees_per_second,
+    //                        imu_data.gyro_z_degrees_per_second);
+    //         new_imu = 0;
+    //     }
+
+    //     HAL_Delay(1);
+
+    //     /* TODO: Convert calibrated pressure to altitude, estimate vertical
+    //      * velocity and call airbrake_tick only during Coast, at AB_DT_MPC.
+    //      * The enum alone does not implement flight-state transitions.
+    //      */
+    // }
 }
 
 static void run_mprls(void)
@@ -198,11 +204,13 @@ void airbrake_start(void)
     airbrake_mpc_init(&mpc, &model, AB_TARGET_APOGEE_M);
 }
 
-void airbrake_tick(float alt_m, float vz_mps)
+// void airbrake_tick(float alt_m, float vz_mps)
+float airbrake_tick(float alt_m, float vz_mps)
 {
     ab_info_t info;
     float alpha = airbrake_mpc_step(&mpc, alt_m, vz_mps, &info);
-    servo_set_opening(alpha);
+    return alpha;
+    // servo_set_opening(alpha);
 }
 
 void servo_set_opening(float a)
@@ -268,6 +276,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         /* Leave unconsumed DMA data intact until the main loop reads it. */
         /* The main-loop-owned new_imu flag is not used in this ISR. */
         imu_status = IMU_IDLE;
+    }
+}
+
+void test_flight(void)
+{
+    for (int i = 0; i < NOISY_DATA_COUNT; i++)
+    {
+        const FlightSample frame = noisy_flight[i];
+
+        float time = frame.time;
+        float altitude = frame.altitude;
+        float velo = frame.velo;
+        float accel = frame.accel;
+        float pressure = frame.pressure;
+
+        float alpha = airbrake_tick(altitude, velo);
+
+        USB_CDC_PRINTF("alpha: %.2f, t: %.2f, h: %.3f, v: %.3f, a: %.3f, rho: %.3f\n",
+                       alpha, time, altitude, velo, accel, pressure);
     }
 }
 
