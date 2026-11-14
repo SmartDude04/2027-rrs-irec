@@ -12,7 +12,6 @@
 
 #include <stdint.h>
 
-#include "airbrake_config.h"
 #include "airbrake_helper.h"
 #include "constants.h"
 
