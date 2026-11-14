@@ -12,3 +12,6 @@ wheels/
 # Code gen stuff
 out/
 stm32_airbrake_mpc/
+
+# Random generatable crap
+*.csv
