@@ -3,39 +3,47 @@
 #include "airbrake_helper.h"
 #include "MPRLS_PRESSURE.h"
 
-static float acceleration(const float altitude, const float velocity, const float theta, const float airbrake_active_area)
+static double acceleration(const double altitude, const double velocity, const float theta, const float airbrake_active_area)
 {
     const float coefficient_of_drag_airbrakes = airbrake_drag_coefficient(airbrake_active_area);
     const float coefficient_of_drag_rocket = rocket_drag_coefficient(airbrake_active_area);
     const float coefficients_of_drag_times_areas = coefficient_of_drag_airbrakes * FULLY_EXTENDED_AIRBRAKE_AREA * airbrake_active_area + coefficient_of_drag_rocket * ROCKET_AREA;
 
     // The fabs() on velocity ensures it returns the correct sign
-    const float drag_acceleration = - theta * 0.5 * air_density_kg_per_meter_cubed(altitude) * velocity * fabs(velocity) * coefficients_of_drag_times_areas / ROCKET_MASS;
+    const double drag_acceleration = - theta * 0.5 * air_density_kg_per_meter_cubed((float) altitude) * velocity * fabs(velocity) * coefficients_of_drag_times_areas / ROCKET_MASS;
     return -ACCELERATION_GRAVITY_MS2 + drag_acceleration;
 }
 
-float apogee_from_airbrakes(float airbrake_state[QP_STATE_SIZE], uint16_t *apogee_state_index, const float cur_altitude, const float cur_velocity, const float cur_theta)
+double airbrake_apogee(float airbrake_state[QP_STATE_SIZE], uint16_t *apogee_index, const float cur_altitude, const float cur_velocity, const float cur_theta)
 {
-    float predicted_altitude = cur_altitude;
-    float predicted_velocity = cur_velocity;
+    double predicted_altitude = cur_altitude;
+    double predicted_velocity = cur_velocity;
+    
+    if (cur_velocity <= 0.0f)
+    {
+        *apogee_index = 0;
+        return cur_altitude;
+    }
     
     for (int i = 0; i < QP_STATE_SIZE; ++i)
     {
-        // If we are going downward, then we have reached apogee; return
-        if (predicted_velocity < 0.0f)
+        const double cur_acceleration = acceleration(predicted_altitude, predicted_velocity, cur_theta, airbrake_state[i]);
+        const double next_velocity = predicted_velocity + cur_acceleration * QP_TIMESTEP_SECONDS;
+        
+        if (next_velocity <= 0.0)
         {
-            *apogee_state_index = i;
-            return predicted_altitude;
+            // Find the time to apogee to return the correct value
+            const double time_to_apogee = -predicted_velocity / cur_acceleration;
+            
+            *apogee_index = i + 1;
+            return predicted_altitude + predicted_velocity * time_to_apogee + 0.5 * cur_acceleration * time_to_apogee * time_to_apogee;
         }
         
-        const float prev_altitude = predicted_altitude;
-        
-        // Update the state
-        predicted_altitude += predicted_velocity * QP_TIMESTEP_SECONDS;
-        predicted_velocity += acceleration(prev_altitude, predicted_velocity, cur_theta, airbrake_state[i]) * QP_TIMESTEP_SECONDS;
+        predicted_altitude += predicted_velocity * QP_TIMESTEP_SECONDS + 0.5 * cur_acceleration * QP_TIMESTEP_SECONDS * QP_TIMESTEP_SECONDS;
+        predicted_velocity = next_velocity;
     }
     
-    // If we get here, we were notable to reach apogee
-    *apogee_state_index = QP_STATE_SIZE - 1;
+    // If we get here, we were unable to reach apogee
+    *apogee_index = QP_STATE_SIZE;
     return predicted_altitude;
 }
