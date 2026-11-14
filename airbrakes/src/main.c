@@ -68,20 +68,24 @@ int main(void)
         // HAL_Delay(1000);
         // continue;
         
-        HAL_Delay(3000);
-        for (int i = 0; i < QP_STATE_SIZE; ++i)
+        run_mprls();
+        run_imu();
+        if (new_imu)
         {
-            airbrake_state[i] = 1.0f;
+            USB_CDC_PRINTF("Acceleration: %f\n", cur_vertical_acceleration);
+            new_imu = 0;
+            HAL_Delay(10);
         }
-        float gradient[QP_STATE_SIZE];
-        airbrake_state_gradient(airbrake_state, gradient, 252.0f, 144.29f, 1.0f);
-        USB_CDC_PRINTF("Gradient:\n");
-        HAL_Delay(5);
-        for (int i = 0; i < QP_STATE_SIZE; ++i)
+        if (new_pressure)
         {
-            USB_CDC_PRINTF("%f\n", gradient[i]);
-            HAL_Delay(2);
+            USB_CDC_PRINTF("Altitude: %f\n", cur_altitude_meters);
+            new_pressure = 0;
+            HAL_Delay(10);
         }
+        // else
+        // {
+        //     USB_CDC_PRINTF("State: %d\n", mprls_status);
+        // }
         continue;
         
         switch (airbrakes_state)
