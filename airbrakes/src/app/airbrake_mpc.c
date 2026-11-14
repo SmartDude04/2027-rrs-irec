@@ -62,7 +62,7 @@ static float accel(const ab_rocket_t *r, float h, float v, float alpha,
 {
   float rho = AB_RHO0 * expf(-h / AB_H_SCALE);
   // C_D = C_DA * A_A * alpha + C_DR * A_R
-  float cda = airbrake_drag_coefficient(alpha * FULLY_EXTENDED_AIRBRAKE_AREA) * alpha * FULLY_EXTENDED_AIRBRAKE_AREA + rocket_drag_coefficient(alpha) * ROCKET_AREA;
+  float cda = airbrake_drag_coefficient(alpha) * alpha * FULLY_EXTENDED_AIRBRAKE_AREA + rocket_drag_coefficient(alpha) * ROCKET_AREA;
   float drag = 0.5f * rho * cda * v * fabsf(v) / r->mass;
   if (evals)
     (*evals)++;
