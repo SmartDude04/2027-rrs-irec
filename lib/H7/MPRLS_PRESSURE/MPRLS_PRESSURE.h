@@ -68,10 +68,10 @@ float altitude_meters(float pressure_hpa);
 /**
  * Converts a pressure and temperature reading to an estimated air density
  * 
- * @param pressure_hpa Pressure, in hPa, of the air
+ * @param altitude_meters Altitude, in meters, above sea level
  * @return Estimated air density in kilograms per meter cubed
  */
-float air_density_kg_per_meter_cubed(float pressure_hpa);
+float air_density_kg_per_meter_cubed(float altitude_meters);
 
 /**
  * Converts a pressure and air density reading to a speed of sound estimated

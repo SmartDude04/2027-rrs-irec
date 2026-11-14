@@ -13,6 +13,7 @@
 #define POWER 5.2561f
 #define SPECIFIC_GAS_CONSTANT_DRY_AIR 287.05f
 #define RATIO_SPECIFIC_HEATS_AIR 1.4f
+#define TEMPERATURE_LAPSE_RATE 0.0065f
 
 uint8_t mprls_pressure_rx_buffer[4] = {0};
 MPRLS_STATUS mprls_status = MPRLS_UNINITIALIZED;
@@ -94,11 +95,16 @@ float altitude_meters(const float pressure_hpa)
     return 0.3048f * 145366.45f * (1 - powf(pressure_hpa / LAUNCH_PRESSURE_HPA, 0.190284f));
 }
 
-float air_density_kg_per_meter_cubed(const float pressure_hpa)
+// float air_density_kg_per_meter_cubed(const float pressure_hpa)
+// {
+//     const float pressure_pascals = pressure_hpa * 100.0f;
+//     
+//     return pressure_pascals / (SPECIFIC_GAS_CONSTANT_DRY_AIR * STANDARD_TEMPERATURE_KELVIN);
+// }
+
+float air_density_kg_per_meter_cubed(const float altitude_meters)
 {
-    const float pressure_pascals = pressure_hpa * 100.0f;
-    
-    return pressure_pascals / (SPECIFIC_GAS_CONSTANT_DRY_AIR * STANDARD_TEMPERATURE_KELVIN);
+    return STANDARD_DENSITY_KG_M3 * powf(1.0f - TEMPERATURE_LAPSE_RATE * altitude_meters / STANDARD_TEMPERATURE_KELVIN, 4.2561f);
 }
 
 float speed_of_sound_meters_per_second(const float pressure_hpa, const float density_kg_meters_cubed)
