@@ -6,7 +6,6 @@
 #include "stm32h7xx_hal.h"
 
 #define MPRLS_PRESSURE_I2C_ADDRESS 0x18
-#define LAUNCH_PRESSURE_HPA 1013.25f
 
 typedef enum
 {

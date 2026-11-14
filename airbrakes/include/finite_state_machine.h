@@ -9,7 +9,7 @@ typedef enum
     COAST,
     CONTROL,
     EXIT,
-    INFEASIBLE
+    ABORT
 } Airbrakes_Finite_State_Machine;
 extern Airbrakes_Finite_State_Machine airbrakes_state;
 
