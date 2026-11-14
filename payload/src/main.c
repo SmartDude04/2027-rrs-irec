@@ -1,4 +1,3 @@
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
@@ -79,10 +78,10 @@ FRESULT FR_Status;
 FATFS *FS_Ptr;
 char filename[16];
 FILINFO fno;
-char radioPayload[256];
+char radioPayload[320];
 uint8_t radio_len = 0;
-bool ARM_FLAG = false;
-const uint32_t SENSOR_TIMEOUT_MS = 150;
+bool ARM_FLAG = true;
+const uint32_t SENSOR_TIMEOUT_MS = 20;
 const uint32_t RECOVERY_INTERVAL_MS = 3000;
 uint32_t SENSOR_ERROR[5] = {0}; // accel, gyro, temp1, temp2, mpr
 double LAUNCH_ALTITUDE_M = 0.0;
@@ -94,9 +93,7 @@ float psiToM(float psi);
 int main()
 {
 	activeState = IDLE;
-
 	HAL_Init();
-
 	SystemClock_Config();
 	MX_GPIO_Init();
 	I2C_Init(&hi2c2);
@@ -108,7 +105,6 @@ int main()
 	radio_link_init(&lora, &link, NODE_PAYLOAD);
 	lora_mode_receive_continuous(&lora);
 	HAL_Delay(1000);
-
 	ICM_init(&icm_sensor);
 	TMP119_setAddr(&temp_sensor1, false);
 	TMP119_setAddr(&temp_sensor2, true);
@@ -117,7 +113,6 @@ int main()
 	{
 		SerialWrite("Error! While Mounting SD Card 0 , Error Code: (%i)\r\n", FR_Status);
 	}
-
 	FR_Status = f_mount(&FatFs, SDPath, 1);
 	if (FR_Status != FR_OK)
 	{
@@ -140,7 +135,7 @@ int main()
 			if (!stateChangeComplete)
 			{
 
-				f_puts("ms,state,ax,ay,az,gx,gy,gz,t1,t2,p,err_acc,err_gyr,err_t1,err_t2,err_mpr,err_sd\n", &Fil);
+				f_puts("ms,state,alt,ax,ay,az,gx,gy,gz,t1,t2,p,rax,ray,raz,rgx,rgy,rgz,rt1,rt2,rp,err_acc,err_gyr,err_t1,err_t2,err_mpr,err_sd\n", &Fil);
 				f_sync(&Fil);
 				TMP119_SetLowPower(&temp_sensor1, true);
 				TMP119_SetLowPower(&temp_sensor2, true);
@@ -181,12 +176,12 @@ int main()
 			// imu on, accellerometer on, TMP off, pressure low reading?
 			if (psiToM(prevPressure) > LAUNCH_ALTITUDE_M && fabsf(filteredAccel[2]) > 0.5)
 			{
-				if (prevPressure > maxPressureSeen)
+				if (psiToM(prevPressure) < psiToM(maxPressureSeen))
 				{
 					maxPressureSeen = prevPressure;
 					ascentCounter = 0;
 				}
-				else if (prevPressure < maxPressureSeen - 0.005)
+				else if (psiToM(prevPressure) > psiToM(maxPressureSeen) + 0.005)
 				{
 					ascentCounter++;
 				}
@@ -220,12 +215,12 @@ int main()
 			// all sensors on reading full
 			if (psiToM(prevPressure) > APOGEE_SEARCH_ALTITUDE_M)
 			{ // update for realistic apogee height
-				if (prevPressure < minPressureSeen)
+				if (psiToM(prevPressure) > psiToM(minPressureSeen))
 				{
 					minPressureSeen = prevPressure;
 					descentCounter = 0;
 				}
-				else if (prevPressure > minPressureSeen + 0.003)
+				else if (psiToM(prevPressure) < psiToM(minPressureSeen) - .005)
 				{
 					descentCounter++;
 				}
@@ -508,73 +503,97 @@ bool sensorReadWrite(void)
 		filteredAccel[0], filteredAccel[1], filteredAccel[2],
 		filteredGyro[0], filteredGyro[1], filteredGyro[2],
 		filteredTemp[0], filteredTemp[1], prevPressure};
+	float rawVals[9] = {
+		(float)icm_sensor.rawX, (float)icm_sensor.rawY, (float)icm_sensor.rawZ,
+		(float)icm_sensor.rawGyroX, (float)icm_sensor.rawGyroY, (float)icm_sensor.rawGyroZ,
+		(float)temp_sensor1.raw, (float)temp_sensor2.raw, (float)mprSensor.pressure};
 	bool good[9] = {
 		!readError[0], !readError[0], !readError[0],
 		!readError[1], !readError[1], !readError[1],
 		!readError[2], !readError[3], !readError[4]};
-
-	for (int i = 0; i < 9 && pos < (int)sizeof(line) - 1; i++)
 	{
-		int n;
-		if (good[i])
-			n = snprintf(line + pos, sizeof(line) - pos, ",%.*f", (i == 8) ? 4 : 2, vals[i]);
-		else
-			n = snprintf(line + pos, sizeof(line) - pos, ",-9999");
-		if (n > 0)
-			pos += n;
-	}
-	if (pos < (int)sizeof(line) - 1)
-	{
-		int n = snprintf(line + pos, sizeof(line) - pos, ",%lu,%lu,%lu,%lu,%lu,%lu\r\n",
-						 (unsigned long)SENSOR_ERROR[0], (unsigned long)SENSOR_ERROR[1],
-						 (unsigned long)SENSOR_ERROR[2], (unsigned long)SENSOR_ERROR[3],
-						 (unsigned long)SENSOR_ERROR[4], (unsigned long)sdErrorCount);
-		if (n > 0)
-			pos += n;
-	}
-	if (pos > (int)sizeof(line) - 1)
-		pos = sizeof(line) - 1;
+		float altM = psiToM(prevPressure);
+		if (pos < (int)sizeof(line) - 1)
+		{
+			int altN = (!readError[4] && !isnan(altM))
+						   ? snprintf(line + pos, sizeof(line) - pos, ",%.2f", altM)
+						   : snprintf(line + pos, sizeof(line) - pos, ",-9999");
+			if (altN > 0)
+				pos += altN;
+		}
+		for (int i = 0; i < 9 && pos < (int)sizeof(line) - 1; i++)
+		{
+			int n;
+			if (good[i])
+				n = snprintf(line + pos, sizeof(line) - pos, ",%.*f", (i == 8) ? 4 : 2, vals[i]);
+			else
+				n = snprintf(line + pos, sizeof(line) - pos, ",-9999");
+			if (n > 0)
+				pos += n;
+		}
+		// raw columns: same validity flags, same column count whether good or bad
+		for (int i = 0; i < 9 && pos < (int)sizeof(line) - 1; i++)
+		{
+			int n;
+			if (good[i])
+				n = snprintf(line + pos, sizeof(line) - pos, ",%.*f", (i == 8) ? 4 : 0, rawVals[i]);
+			else
+				n = snprintf(line + pos, sizeof(line) - pos, ",-9999");
+			if (n > 0)
+				pos += n;
+		}
+		if (pos < (int)sizeof(line) - 1)
+		{
+			int n = snprintf(line + pos, sizeof(line) - pos, ",%lu,%lu,%lu,%lu,%lu,%lu\r\n",
+							 (unsigned long)SENSOR_ERROR[0], (unsigned long)SENSOR_ERROR[1],
+							 (unsigned long)SENSOR_ERROR[2], (unsigned long)SENSOR_ERROR[3],
+							 (unsigned long)SENSOR_ERROR[4], (unsigned long)sdErrorCount);
+			if (n > 0)
+				pos += n;
+		}
+		if (pos > (int)sizeof(line) - 1)
+			pos = sizeof(line) - 1;
 
-	/* ---------- write + sync ---------- */
-	UINT bw = 0;
-	FRESULT r = f_write(&Fil, line, pos, &bw);
-	int n = snprintf(radioPayload, sizeof(radioPayload), "%lu,%s,%.1f,%.1f,%.1f,%.4f",
-					 (unsigned long)HAL_GetTick(), stateNames[activeState],
-					 good[0] ? vals[0] : -9999.0f,
-					 good[1] ? vals[1] : -9999.0f,
-					 good[2] ? vals[2] : -9999.0f,
-					 good[8] ? vals[8] : -9999.0f);
-	if (n < 0)
-		n = 0;
-	if (n >= (int)sizeof(radioPayload))
-		n = sizeof(radioPayload) - 1;
-	radio_len = (uint8_t)n;
-	if (r != FR_OK || bw != (UINT)pos)
-		sdErrorCount++;
-
-	if (HAL_GetTick() - timeLastSync > 2500)
-	{
-		if (f_sync(&Fil) != FR_OK)
+		/* ---------- write + sync ---------- */
+		UINT bw = 0;
+		FRESULT r = f_write(&Fil, line, pos, &bw);
+		int n = snprintf(radioPayload, sizeof(radioPayload), "%lu,%s,%.1f,%.1f,%.1f,%.4f",
+						 (unsigned long)HAL_GetTick(), stateNames[activeState],
+						 good[0] ? vals[0] : -9999.0f,
+						 good[1] ? vals[1] : -9999.0f,
+						 good[2] ? vals[2] : -9999.0f,
+						 good[8] ? vals[8] : -9999.0f);
+		if (n < 0)
+			n = 0;
+		if (n >= (int)sizeof(radioPayload))
+			n = sizeof(radioPayload) - 1;
+		radio_len = (uint8_t)n;
+		if (r != FR_OK || bw != (UINT)pos)
 			sdErrorCount++;
-		timeLastSync = HAL_GetTick();
+
+		if (HAL_GetTick() - timeLastSync > 2500)
+		{
+			if (f_sync(&Fil) != FR_OK)
+				sdErrorCount++;
+			timeLastSync = HAL_GetTick();
+		}
+
+		return !readError[4];
 	}
 
-	return !readError[4];
-}
-
-float getAltFromLaunchM(float currentPSI)
-{
-	return psiToM(currentPSI) - LAUNCH_ALTITUDE_M;
-}
-float mtoft(float meters)
-{
-	return meters * 3.28084;
-}
-float psiToM(float psi)
-{
-	if (!(psi > 0.0f && psi < 20.0f))
+	float getAltFromLaunchM(float currentPSI)
 	{
-		return NAN;
+		return psiToM(currentPSI) - LAUNCH_ALTITUDE_M;
 	}
-	return (1 - powf((psi / 14.696), 0.190284)) * 145366.45 * 0.3048;
-}
+	float mtoft(float meters)
+	{
+		return meters * 3.28084;
+	}
+	float psiToM(float psi)
+	{
+		if (!(psi > 0.0f && psi < 20.0f))
+		{
+			return NAN;
+		}
+		return (1 - powf((psi / 14.696), 0.190284)) * 145366.45 * 0.3048;
+	}
