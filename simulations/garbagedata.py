@@ -1,23 +1,28 @@
-import csv
-
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
-SIZE = 50000
+nominal_data = pd.read_csv("nominal-flight.csv")
 
-header = ["position_m", "velocity_mps", "acceleration_mps2", "pressure_pa"]
+rng = np.random.default_rng(seed=42)
 
-rng = np.random.default_rng()
-pos = rng.integers(low=0, high=1000, size=SIZE)
-velo = rng.integers(low=0, high=1000, size=SIZE)
-accel = rng.integers(low=0, high=1000, size=SIZE)
-rho = rng.integers(low=0, high=1000, size=SIZE)
+num_cols = nominal_data.select_dtypes(include=[np.number]).columns
 
-rows = [[]] * SIZE
+mean = 0.0
+std_dev = 5
+noise = rng.normal(loc=mean, scale=std_dev, size=nominal_data[num_cols].shape)
 
-for i in range(SIZE):
-    rows[i] = [pos[i], velo[i], accel[i], rho[i]]
+noisy = nominal_data.copy()
+noisy[num_cols] = noisy[num_cols] + noise
 
-with open("flights.csv", "w", newline="", encoding="utf-8") as file:
-    writer = csv.writer(file)
-    writer.writerow(header)
-    writer.writerows(rows)
+noisy["Time (s)"] = nominal_data["Time (s)"]
+
+noisy.to_csv("noise-flight.csv", index=False)
+
+plt.figure()
+plt.plot(nominal_data["Time (s)"], nominal_data["Vertical acceleration (m/s²)"], label="Nominal")
+plt.plot(noisy["Time (s)"], noisy["Vertical acceleration (m/s²)"], label="Noisy")
+plt.xlabel("Time (s)")
+plt.ylabel("Vertical acceleration (m/s²)")
+plt.legend()
+plt.show()
