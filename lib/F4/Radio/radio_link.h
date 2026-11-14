@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "lora_sx1276.h"
 #include "protocol.h"
+#include "message_types.h"
 
 #define RADIO_LINK_RX_QUEUE_SIZE 4
 
@@ -14,7 +15,7 @@ enum radio_status {
     RADIO_TIMEOUT,
     RADIO_ERROR,
     RADIO_CRC_ERROR,
-    RADIO_NO_PACKET
+    RADIO_PACKET_ERROR,
 };
 
 /**
@@ -74,7 +75,7 @@ bool radio_link_init(lora_sx1276 *lora, struct radio_link *link, uint8_t node_id
  * @param data - byte array that will be sent
  * @param data_length - length of data array
 */
-bool radio_link_send(
+uint8_t radio_link_send(
     struct radio_link *link,
     uint8_t destination,
     uint8_t message_type,
@@ -86,7 +87,7 @@ bool radio_link_send(
  * @brief Receives a message and adds it to the rx_queue
  * @param link - radio link the message is added to to
  */
-void radio_link_receive(struct radio_link *link);
+uint8_t radio_link_receive(struct radio_link *link);
 
 /**
  * @brief Checks if there is a message in the queue

@@ -7,7 +7,7 @@
 
 typedef enum
 {
-    COMM_OK = 0,
+    COMM_OK,
     COMM_ERROR,
     COMM_INVALID_ARGUMENT,
     COMM_TX_FAILED
@@ -17,7 +17,7 @@ typedef enum
 uint8_t radio_checkin(struct radio_link *link, uint8_t destination);
 uint8_t radio_command(struct radio_link *link, uint8_t destination, uint8_t command);
 uint8_t radio_request_data(struct radio_link *link, uint8_t destination);
-uint8_t radio_rx_process(struct radio_link *link);
+void radio_rx_process(struct radio_link *link);
 
 
 #endif

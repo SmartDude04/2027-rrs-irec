@@ -19,18 +19,15 @@ double airbrake_apogee(float airbrake_state[QP_STATE_SIZE], uint16_t *apogee_ind
 {
     double predicted_altitude = cur_altitude;
     double predicted_velocity = cur_velocity;
-
     if (cur_velocity <= 0.0f)
     {
         *apogee_index = 0;
         return cur_altitude;
     }
-
     for (int i = 0; i < QP_STATE_SIZE; ++i)
     {
         const double cur_acceleration = acceleration(predicted_altitude, predicted_velocity, cur_theta, airbrake_state[i]);
         const double next_velocity = predicted_velocity + cur_acceleration * QP_TIMESTEP_SECONDS;
-
         if (next_velocity <= 0.0)
         {
             // Find the time to apogee to return the correct value

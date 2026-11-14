@@ -7,25 +7,27 @@
 
 #define ICM_20948_I2C_ADDRESS 0x69
 
-extern uint8_t icm_20948_rx_buffer[12];
+extern uint8_t volatile icm_20948_rx_buffer[14];
 
 typedef enum
 {
     IMU_UNINITIALIZED,
     IMU_IDLE, // No work is being done
+    IMU_MAKE_MEASUREMENT, // Triggered by the timer to make a measurement
     IMU_RX_PENDING, // Between the I2C request being made and the callback signaling it is complete
     IMU_DATA_READY // I2C request is complete and data is in *mprls_pressure_rx_buffer
 } IMU_STATUS;
-extern IMU_STATUS imu_status;
+extern volatile IMU_STATUS imu_status;
 
 typedef struct
 {
-    double acceleration_x_meters_per_second_squared;
-    double acceleration_y_meters_per_second_squared;
-    double acceleration_z_meters_per_second_squared;
-    double gyro_x_degrees_per_second;
-    double gyro_y_degrees_per_second;
-    double gyro_z_degrees_per_second;
+    float acceleration_x_meters_per_second_squared;
+    float acceleration_y_meters_per_second_squared;
+    float acceleration_z_meters_per_second_squared;
+    float gyro_x_degrees_per_second;
+    float gyro_y_degrees_per_second;
+    float gyro_z_degrees_per_second;
+    float temperature_celsius;
 } IMU_Data;
 
 
@@ -48,6 +50,12 @@ HAL_StatusTypeDef read_acceleration_gyro();
  * @return An IMU_Data struct containing acceleration and gyroscope data
  */
 IMU_Data imu_data_from_rx_buffer();
+
+/**
+ * Converts a temperature from Kelvin to Celsius
+ * @return Temperature in Kelvin
+ */
+float celsius_to_kelvin(float temperature_celsius);
 
 
 #endif

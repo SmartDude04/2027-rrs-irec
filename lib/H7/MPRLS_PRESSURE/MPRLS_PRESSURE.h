@@ -24,6 +24,8 @@ extern uint8_t volatile mprls_pressure_rx_buffer[4];
 
 /**
  * Initializes the MPRLS pressure sensor. Specifically, sets PB8 as input to be called when data is ready
+ *
+ * Uses I2C1 (PB6 as SCL and PB7 as SDA)
  */
 void mprls_init();
 
