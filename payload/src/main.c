@@ -114,13 +114,16 @@ int main()
 	TMP119_setAddr(&temp_sensor1, false);
 	TMP119_setAddr(&temp_sensor2, true);
 	FR_Status = f_mount(&FatFs, SDPath, 0);
+	HAL_Delay(5000);
+	SerialWrite("MAIN");
 	if (FR_Status != FR_OK)
 	{
 		while(1){	
 		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		HAL_Delay(100);
+		HAL_Delay(400);
 		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		HAL_Delay(500);
+		HAL_Delay(1000);
+		SerialWrite("Error! While Mounting SD Card 0 , Error Code: (%i)\r\n", FR_Status);
 		}
 	}
 	FR_Status = f_mount(&FatFs, SDPath, 1);
@@ -128,9 +131,9 @@ int main()
 	{
 		while(1){	
 		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		HAL_Delay(100);
+		HAL_Delay(400);
 		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		HAL_Delay(500);
+		HAL_Delay(1000);
 		}
 	}
 	for (int i = 0; i < 1000; i++)
@@ -292,6 +295,8 @@ int main()
 			ARM_FLAG = true;
 			radio_flag = 0;
 		}
+		SerialWrite("state: %s\r\n",
+					stateNames[activeState]);
 		HAL_Delay(10);
 	}
 }
