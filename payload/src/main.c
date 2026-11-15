@@ -52,7 +52,7 @@ double minPressureSeen = 999.0;
 double maxPressureSeen = 0.0;
 double alpha = .35;
 const uint32_t SENSOR_TIMEOUT_MS = 20;
-const uint32_t RECOVERY_INTERVAL_MS = 3000;
+const uint32_t RECOVERY_INTERVAL_MS = 10000;
 uint32_t SENSOR_ERROR[5] = {0}; // accel, gyro, temp1, temp2, mpr
 double LAUNCH_ALTITUDE_M = 67.0;
 double APOGEE_SEARCH_ALTITUDE_M = 800.0;
@@ -94,7 +94,7 @@ char filename[16];
 FILINFO fno;
 char radioPayload[128];
 uint8_t radio_len = 0;
-bool ARM_FLAG = true;
+bool ARM_FLAG = false;
 
 int main()
 {
@@ -291,8 +291,9 @@ int main()
 			radio_link_send(&link, NODE_GROUND_STATION, MSG_TELEMETRY_ACK, (uint8_t *)radioPayload, strlen(radioPayload));
 			radio_flag = 0;
 		}
-		if (radio_flag == MSG_COMMAND_ARM)
+		if (radio_flag == MSG_COMMAND_ARM &&activeState == IDLE)
 		{
+
 			ARM_FLAG = true;
 			radio_flag = 0;
 		}

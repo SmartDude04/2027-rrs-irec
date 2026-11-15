@@ -47,6 +47,11 @@ void radio_rx_process(struct radio_link *link) {
                 // The data shold be of type command_ack
                 // Check which one it was and save to radio_status
                 break;
+            case MSG_COMMAND_ARM:
+                // The data should be of type command_arm
+                // Check which one it was and save to radio_status
+                radio_flag = MSG_COMMAND_ARM;
+                break;
             case MSG_TELEMETRY:
                 radio_flag = MSG_TELEMETRY;
                 break;
