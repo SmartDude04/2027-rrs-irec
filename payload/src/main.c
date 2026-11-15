@@ -25,7 +25,6 @@ float psiToM(float psi);
 float calibrateOffsetPSI(float knownAltM, int CAL_NUM_READS, double alpha);
 I2C_HandleTypeDef hi2c2;
 
-
 lora_sx1276 lora = {
 	.frequency = 433000000,
 	.nss_pin = GPIO_PIN_2,
@@ -43,6 +42,7 @@ lora_sx1276 lora = {
 	.spi_timeout = LORA_DEFAULT_SPI_TIMEOUT};
 struct radio_link link;
 
+
 struct ICM icm_sensor;
 MPR_Data mprSensor;
 struct tmp119 temp_sensor1;
@@ -56,7 +56,7 @@ const uint32_t RECOVERY_INTERVAL_MS = 3000;
 uint32_t SENSOR_ERROR[5] = {0}; // accel, gyro, temp1, temp2, mpr
 double LAUNCH_ALTITUDE_M = 67.0;
 double APOGEE_SEARCH_ALTITUDE_M = 800.0;
-float offsetPSI =0;
+float offsetPSI = 0;
 float filteredAccel[3] = {-9999.0f, -9999.0f, -9999.0f};
 float filteredGyro[3] = {-9999.0f, -9999.0f, -9999.0f};
 float filteredTemp[2] = {-9999.0f, -9999.0f};
@@ -92,7 +92,7 @@ FRESULT FR_Status;
 FATFS *FS_Ptr;
 char filename[16];
 FILINFO fno;
-char radioPayload[320];
+char radioPayload[128];
 uint8_t radio_len = 0;
 bool ARM_FLAG = true;
 
@@ -108,32 +108,31 @@ int main()
 	MX_SDIO_SD_Init();
 	MX_FATFS_Init();
 	radio_link_init(&lora, &link, NODE_PAYLOAD);
-	lora_mode_receive_continuous(&lora);
 	HAL_Delay(1000);
 	ICM_init(&icm_sensor);
 	TMP119_setAddr(&temp_sensor1, false);
 	TMP119_setAddr(&temp_sensor2, true);
 	FR_Status = f_mount(&FatFs, SDPath, 0);
-	HAL_Delay(5000);
-	SerialWrite("MAIN");
+
 	if (FR_Status != FR_OK)
 	{
-		while(1){	
-		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		HAL_Delay(400);
-		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		HAL_Delay(1000);
-		SerialWrite("Error! While Mounting SD Card 0 , Error Code: (%i)\r\n", FR_Status);
+		while (1)
+		{
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+			HAL_Delay(400);
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+			HAL_Delay(1000);
 		}
 	}
 	FR_Status = f_mount(&FatFs, SDPath, 1);
 	if (FR_Status != FR_OK)
 	{
-		while(1){	
-		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		HAL_Delay(400);
-		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-		HAL_Delay(1000);
+		while (1)
+		{
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+			HAL_Delay(400);
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+			HAL_Delay(1000);
 		}
 	}
 	for (int i = 0; i < 1000; i++)
@@ -143,6 +142,7 @@ int main()
 			break;
 	}
 	FR_Status = f_open(&Fil, filename, FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+	HAL_Delay(1000);
 	while (1)
 	{
 
@@ -152,7 +152,7 @@ int main()
 			if (!stateChangeComplete)
 			{
 
-				f_puts("ms,state,alt,ax,ay,az,gx,gy,gz,t1,t2,p,rax,ray,raz,rgx,rgy,rgz,rt1,rt2,rp,err_acc,err_gyr,err_t1,err_t2,err_mpr,err_sd\n", &Fil);
+				f_puts("ms,state,alt,ax,ay,az,gx,gy,gz,t1,t2,p,rax,ray,raz,rgx,rgy,rgz,rt1,rt2,rp,err_acc,err_gyr,err_t1,err_t2,err_mpr,err_sd,rssi,snr\n", &Fil);
 				f_sync(&Fil);
 				TMP119_SetLowPower(&temp_sensor1, true);
 				TMP119_SetLowPower(&temp_sensor2, true);
@@ -162,7 +162,7 @@ int main()
 			}
 			// broken by radio command to "ARM" - switch to case ARMED
 			// all but radio off
-			if (ARM_FLAG) 
+			if (ARM_FLAG)
 			{
 				stateChangeComplete = false;
 				activeState = ARMED;
@@ -180,7 +180,7 @@ int main()
 			{
 				offsetPSI = calibrateOffsetPSI(LAUNCH_ALTITUDE_M, 100, alpha);
 				f_sync(&Fil);
-				//alpha = .75;
+				// alpha = .75;
 				TMP119_SetLowPower(&temp_sensor1, false);
 				TMP119_SetLowPower(&temp_sensor2, false);
 				ICM_setLowPower(false);
@@ -219,7 +219,7 @@ int main()
 			{
 				ascentStart = HAL_GetTick();
 				f_sync(&Fil);
-				//alpha = .75;
+				// alpha = .75;
 				TMP119_SetLowPower(&temp_sensor1, false);
 				TMP119_SetLowPower(&temp_sensor2, false);
 				ICM_setLowPower(false);
@@ -258,7 +258,7 @@ int main()
 			{
 				descentStart = HAL_GetTick();
 				f_sync(&Fil);
-				//alpha = .75;
+				// alpha = .75;
 				stateChangeComplete = true;
 			}
 			sensorReadWrite();
@@ -285,9 +285,10 @@ int main()
 			break;
 		}
 		radio_rx_process(&link);
+		
 		if (radio_flag == MSG_TELEMETRY)
 		{
-			radio_link_send(&link, NODE_GROUND_STATION, MSG_TELEMETRY, (uint8_t *)radioPayload, radio_len);
+			radio_link_send(&link, NODE_GROUND_STATION, MSG_TELEMETRY_ACK, (uint8_t *)radioPayload, strlen(radioPayload));
 			radio_flag = 0;
 		}
 		if (radio_flag == MSG_COMMAND_ARM)
@@ -295,15 +296,14 @@ int main()
 			ARM_FLAG = true;
 			radio_flag = 0;
 		}
-		SerialWrite("state: %s\r\n",
-					stateNames[activeState]);
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 		HAL_Delay(10);
 	}
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+	
 	if (hi2c != &hi2c2)
 	{
 		return;
@@ -326,7 +326,6 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 		TMP119_GetTemperature(&temp_sensor2);
 	}
 }
-
 
 void exponentialFilter(float input, float *previous, double alpha)
 {
@@ -475,80 +474,120 @@ bool sensorReadWrite(void)
 				pos += altN;
 		}
 	}
-		for (int i = 0; i < 9 && pos < (int)sizeof(line) - 1; i++)
-		{
-			int n;
-			if (good[i])
-				n = snprintf(line + pos, sizeof(line) - pos, ",%.*f", (i == 8) ? 4 : 2, vals[i]);
-			else
-				n = snprintf(line + pos, sizeof(line) - pos, ",-9999");
-			if (n > 0)
-				pos += n;
-		}
-		// raw columns: same validity flags, same column count whether good or bad
-		for (int i = 0; i < 9 && pos < (int)sizeof(line) - 1; i++)
-		{
-			int n;
-			if (good[i])
-				n = snprintf(line + pos, sizeof(line) - pos, ",%.*f", (i == 8) ? 4 : 0, rawVals[i]);
-			else
-				n = snprintf(line + pos, sizeof(line) - pos, ",-9999");
-			if (n > 0)
-				pos += n;
-		}
-		if (pos < (int)sizeof(line) - 1)
-		{
-			int n = snprintf(line + pos, sizeof(line) - pos, ",%lu,%lu,%lu,%lu,%lu,%lu\r\n",
-							 (unsigned long)SENSOR_ERROR[0], (unsigned long)SENSOR_ERROR[1],
-							 (unsigned long)SENSOR_ERROR[2], (unsigned long)SENSOR_ERROR[3],
-							 (unsigned long)SENSOR_ERROR[4], (unsigned long)sdErrorCount);
-			if (n > 0)
-				pos += n;
-		}
-		if (pos > (int)sizeof(line) - 1)
-			pos = sizeof(line) - 1;
-
-		/* ---------- write + sync ---------- */
-		UINT bw = 0;
-		FRESULT r = f_write(&Fil, line, pos, &bw);
-		int n = snprintf(radioPayload, sizeof(radioPayload), "%lu,%s,%.1f,%.1f,%.1f,%.4f",
-						 (unsigned long)HAL_GetTick(), stateNames[activeState],
-						 good[0] ? vals[0] : -9999.0f,
-						 good[1] ? vals[1] : -9999.0f,
-						 good[2] ? vals[2] : -9999.0f,
-						 good[8] ? vals[8] : -9999.0f);
-		if (n < 0)
-			n = 0;
-		if (n >= (int)sizeof(radioPayload))
-			n = sizeof(radioPayload) - 1;
-		radio_len = (uint8_t)n;
-		if (r != FR_OK || bw != (UINT)pos)
-			sdErrorCount++;
-
-		if (HAL_GetTick() - timeLastSync > 2500)
-		{
-			if (f_sync(&Fil) != FR_OK)
-				sdErrorCount++;
-			timeLastSync = HAL_GetTick();
-		}
-
-		return !readError[4];
-	}
-
-	float getAltFromLaunchM(float currentPSI)
+	for (int i = 0; i < 9 && pos < (int)sizeof(line) - 1; i++)
 	{
-		return psiToM(currentPSI) - LAUNCH_ALTITUDE_M;
+		int n;
+		if (good[i])
+			n = snprintf(line + pos, sizeof(line) - pos, ",%.*f", (i == 8) ? 4 : 2, vals[i]);
+		else
+			n = snprintf(line + pos, sizeof(line) - pos, ",-9999");
+		if (n > 0)
+			pos += n;
 	}
-	float mtoft(float meters)
+	// raw columns: same validity flags, same column count whether good or bad
+	for (int i = 0; i < 9 && pos < (int)sizeof(line) - 1; i++)
 	{
-		return meters * 3.28084;
+		int n;
+		if (good[i])
+			n = snprintf(line + pos, sizeof(line) - pos, ",%.*f", (i == 8) ? 4 : 0, rawVals[i]);
+		else
+			n = snprintf(line + pos, sizeof(line) - pos, ",-9999");
+		if (n > 0)
+			pos += n;
 	}
-	float psiToM(float psi)
+	if (pos < (int)sizeof(line) - 1)
+	{
+		int n = snprintf(line + pos, sizeof(line) - pos, ",%lu,%lu,%lu,%lu,%lu,%lu\r\n",
+						 (unsigned long)SENSOR_ERROR[0], (unsigned long)SENSOR_ERROR[1],
+						 (unsigned long)SENSOR_ERROR[2], (unsigned long)SENSOR_ERROR[3],
+						 (unsigned long)SENSOR_ERROR[4], (unsigned long)sdErrorCount);
+		if (n > 0)
+			pos += n;
+	}
+	if (pos < (int)sizeof(line) - 1)
 {
-    if (!(psi > 0.0f && psi < 20.0f)) return NAN;
-    return (1.0f - powf(psi / offsetPSI, 0.190284f)) * 44307.69f;
+	int n = snprintf(line + pos, sizeof(line) - pos, ",%4.2d", &link.stats.last_rssi_dbm);
+	if (n > 0)
+		pos += n;
 }
-	float calibrateOffsetPSI(float knownAltM, int CAL_NUM_READS, double alpha)
+if (pos < (int)sizeof(line) - 1)
+{
+	int n = snprintf(line + pos, sizeof(line) - pos, ",%4.2d", &link.stats.last_snr_db);
+	if (n > 0)
+		pos += n;
+}
+	if (pos > (int)sizeof(line) - 1)
+		pos = sizeof(line) - 1;
+
+	/* ---------- write + sync ---------- */
+	UINT bw = 0;
+	FRESULT r = f_write(&Fil, line, pos, &bw);
+
+	{
+		float radioAlt = psiToM(prevPressure);
+		uint8_t rpos = snprintf(radioPayload, sizeof(radioPayload), "%lu,%s",
+							(unsigned long)HAL_GetTick(), stateNames[activeState]);
+
+		// alt (3rd column)
+		if (rpos < sizeof(radioPayload) - 1)
+		{
+			uint8_t rn = (!readError[4] && !isnan(radioAlt))
+						 ? snprintf(radioPayload + rpos, sizeof(radioPayload) - rpos, ",%.2f", radioAlt)
+						 : snprintf(radioPayload + rpos, sizeof(radioPayload) - rpos, ",-9999");
+			if (rn > 0)
+				rpos += rn;
+		}
+
+		// ax,ay,az,gx,gy,gz,t1,t2,p
+		for (int i = 0; i < 9 && rpos < sizeof(radioPayload) - 1; i++)
+		{
+			uint8_t rn;
+			if (good[i])
+				rn = snprintf(radioPayload + rpos, sizeof(radioPayload) - rpos, ",%.*f", (i == 8) ? 4 : 2, vals[i]);
+			else
+				rn = snprintf(radioPayload + rpos, sizeof(radioPayload) - rpos, ",-99");
+			if (rn > 0)
+				rpos += rn;
+		}
+
+		if (rpos < 0)
+			rpos = 0;
+		if (rpos >= sizeof(radioPayload))
+			rpos = sizeof(radioPayload) - 1;
+		radio_len = rpos;
+	}
+
+
+
+	
+	if (r != FR_OK || bw != (UINT)pos)
+		sdErrorCount++;
+
+	if (HAL_GetTick() - timeLastSync > 2500)
+	{
+		if (f_sync(&Fil) != FR_OK)
+			sdErrorCount++;
+		timeLastSync = HAL_GetTick();
+	}
+
+	return !readError[4];
+}
+
+float getAltFromLaunchM(float currentPSI)
+{
+	return psiToM(currentPSI) - LAUNCH_ALTITUDE_M;
+}
+float mtoft(float meters)
+{
+	return meters * 3.28084;
+}
+float psiToM(float psi)
+{
+	if (!(psi > 0.0f && psi < 20.0f))
+		return NAN;
+	return (1.0f - powf(psi / offsetPSI, 0.190284f)) * 44307.69f;
+}
+float calibrateOffsetPSI(float knownAltM, int CAL_NUM_READS, double alpha)
 {
 	for (int i = 0; i < CAL_NUM_READS; i++)
 	{
@@ -565,8 +604,7 @@ bool sensorReadWrite(void)
 	return prevPressure / powf(1.0f - knownAltM / 44307.69f, 5.2553f);
 }
 
-
-	void gpio_init()
+void gpio_init()
 {
 	__HAL_RCC_GPIOC_CLK_ENABLE();
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -634,115 +672,4 @@ void Error_Handler(void)
 	{
 	}
 	/* USER CODE END Error_Handler_Debug */
-}
-
-void SDIO_SDCard_Test(void)
-{
-  FATFS FatFs;
-  FIL Fil;
-  FRESULT FR_Status;
-  FATFS *FS_Ptr;
-  UINT RWC, WWC; // Read/Write Word Counter
-  DWORD FreeClusters;
-  uint32_t TotalSize, FreeSpace;
-  char RW_Buffer[200];
-
-  BYTE work[512] __attribute__ ((aligned (4)));  /* Work area (larger is better for processing time) */
-  do
-  {
-    //------------------[ Mount The SD Card ]--------------------
-    FR_Status = f_mount(&FatFs, SDPath, 0);
-    if (FR_Status != FR_OK)
-    {
-      SerialWrite("Error! While Mounting SD Card 0 , Error Code: (%i)\r\n", FR_Status);
-      break;
-    }
-	FR_Status = f_mkfs(SDPath, FM_ANY, 0, work, sizeof(work));
-  	if (FR_Status != FR_OK) 
-	{
-	  SerialWrite("Error! While Formatting SD Card, Error Code: (%i)\r\n", FR_Status);
-	  break;
-    }
-	FR_Status = f_mount(&FatFs, SDPath, 1);
-    if (FR_Status != FR_OK)
-    {
-      SerialWrite("Error! While Mounting SD Card 1, Error Code: (%i)\r\n", FR_Status);
-      break;
-    }
-    SerialWrite("SD Card Mounted Successfully! \r\n\n");
-    //------------------[ Get & Print The SD Card Size & Free Space ]--------------------
-    f_getfree("", &FreeClusters, &FS_Ptr);
-    TotalSize = (uint32_t)((FS_Ptr->n_fatent - 2) * FS_Ptr->csize * 0.5);
-    FreeSpace = (uint32_t)(FreeClusters * FS_Ptr->csize * 0.5);
-    SerialWrite("Total SD Card Size: %lu Bytes\r\n", TotalSize);
-    SerialWrite("Free SD Card Space: %lu Bytes\r\n\n", FreeSpace);
-    //------------------[ Open A Text File For Write & Write Data ]--------------------
-    // Open the file
-    FR_Status = f_open(&Fil, "MyTextFile.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
-    if(FR_Status != FR_OK)
-    {
-      SerialWrite("Error! While Creating/Opening A New Text File, Error Code: (%i)\r\n", FR_Status);
-      break;
-    }
-    SerialWrite("Text File Created & Opened! Writing Data To The Text File..\r\n\n");
-    // (1) Write Data To The Text File [ Using f_puts() Function ]
-    f_puts("Hello! From STM32 To SD Card Over SDIO + DMA, Using f_puts()\n", &Fil);
-    // (2) Write Data To The Text File [ Using f_write() Function ]
-    strcpy(RW_Buffer, "Hello! From STM32 To SD Card Over SDIO + DMA, Using f_write()\r\n");
-    f_write(&Fil, RW_Buffer, strlen(RW_Buffer), &WWC);
-    // Close The File
-    f_close(&Fil);
-    //------------------[ Open A Text File For Read & Read Its Data ]--------------------
-    // Open The File
-    FR_Status = f_open(&Fil, "MyTextFile.txt", FA_READ);
-    if(FR_Status != FR_OK)
-    {
-      SerialWrite("Error! While Opening (MyTextFile.txt) File For Read.. \r\n");
-      break;
-    }
-    // (1) Read The Text File's Data [ Using f_gets() Function ]
-    f_gets(RW_Buffer, sizeof(RW_Buffer), &Fil);
-    SerialWrite("Data Read From (MyTextFile.txt) Using f_gets():%s", RW_Buffer);
-    // (2) Read The Text File's Data [ Using f_read() Function ]
-    f_read(&Fil, RW_Buffer, f_size(&Fil), &RWC);
-    SerialWrite("Data Read From (MyTextFile.txt) Using f_read():%s", RW_Buffer);
-    // Close The File
-    f_close(&Fil);
-    SerialWrite("File Closed! \r\n\n");
-    //------------------[ Open An Existing Text File, Update Its Content, Read It Back ]--------------------
-    // (1) Open The Existing File For Write (Update)
-    FR_Status = f_open(&Fil, "MyTextFile.txt", FA_OPEN_EXISTING | FA_WRITE);
-    FR_Status = f_lseek(&Fil, f_size(&Fil)); // Move The File Pointer To The EOF (End-Of-File)
-    if(FR_Status != FR_OK)
-    {
-      SerialWrite("Error! While Opening (MyTextFile.txt) File For Update.. \r\n");
-      break;
-    }
-    // (2) Write New Line of Text Data To The File
-    FR_Status = f_puts("This New Line Was Added During File Update!\r\n", &Fil);
-    f_close(&Fil);
-    memset(RW_Buffer,'\0',sizeof(RW_Buffer)); // Clear The Buffer
-    // (3) Read The Contents of The Text File After The Update
-    FR_Status = f_open(&Fil, "MyTextFile.txt", FA_READ); // Open The File For Read
-    f_read(&Fil, RW_Buffer, f_size(&Fil), &RWC);
-    SerialWrite("Data Read From (MyTextFile.txt) After Update:\r\n%s", RW_Buffer);
-    f_close(&Fil);
-    //------------------[ Delete The Text File ]--------------------
-    // Delete The File
-    /*
-    FR_Status = f_unlink(MyTextFile.txt);
-    if (FR_Status != FR_OK){
-        SerialWrite("Error! While Deleting The (MyTextFile.txt) File.. \r\n");
-        USC_CDC_Print(TxBuffer);
-    }
-    */
-  } while(0);
-  //------------------[ Test Complete! Unmount The SD Card ]--------------------
-  FR_Status = f_mount(NULL, "", 0);
-  if (FR_Status != FR_OK)
-  {
-      SerialWrite("\r\nError! While Un-mounting SD Card, Error Code: (%i)\r\n", FR_Status);
-  } else{
-      SerialWrite("\r\nSD Card Un-mounted Successfully! \r\n");
-  }
 }

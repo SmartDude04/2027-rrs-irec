@@ -48,7 +48,7 @@ uint8_t radio_link_send(struct radio_link *link, uint8_t destination, uint8_t me
     if(lora_is_transmitting(link->lora)) {
         return RADIO_BUSY;
     }
-    uint8_t ret = lora_send_packet_blocking(link->lora, tx_buffer, data_length + 8, 100);
+    uint8_t ret = lora_send_packet_blocking(link->lora, tx_buffer, data_length + 8, 200);
     if (ret != LORA_OK) {
         return ret;
     }
