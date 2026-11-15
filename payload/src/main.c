@@ -94,7 +94,7 @@ char filename[16];
 FILINFO fno;
 char radioPayload[128];
 uint8_t radio_len = 0;
-bool ARM_FLAG = false;
+bool ARM_FLAG = true;
 
 int main()
 {
@@ -498,7 +498,7 @@ bool sensorReadWrite(void)
 	}
 	if (pos < (int)sizeof(line) - 1)
 	{
-		int n = snprintf(line + pos, sizeof(line) - pos, ",%lu,%lu,%lu,%lu,%lu,%lu\r\n",
+		int n = snprintf(line + pos, sizeof(line) - pos, ",%lu,%lu,%lu,%lu,%lu,%lu",
 						 (unsigned long)SENSOR_ERROR[0], (unsigned long)SENSOR_ERROR[1],
 						 (unsigned long)SENSOR_ERROR[2], (unsigned long)SENSOR_ERROR[3],
 						 (unsigned long)SENSOR_ERROR[4], (unsigned long)sdErrorCount);
@@ -507,13 +507,13 @@ bool sensorReadWrite(void)
 	}
 	if (pos < (int)sizeof(line) - 1)
 {
-	int n = snprintf(line + pos, sizeof(line) - pos, ",%4.2d", &link.stats.last_rssi_dbm);
+	int n = snprintf(line + pos, sizeof(line) - pos, ",%i", &link.stats.last_rssi_dbm);
 	if (n > 0)
 		pos += n;
 }
 if (pos < (int)sizeof(line) - 1)
 {
-	int n = snprintf(line + pos, sizeof(line) - pos, ",%4.2d", &link.stats.last_snr_db);
+	int n = snprintf(line + pos, sizeof(line) - pos, ",%i\r\n", &link.stats.last_snr_db);
 	if (n > 0)
 		pos += n;
 }
