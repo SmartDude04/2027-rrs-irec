@@ -27,11 +27,7 @@ lora_sx1276 lora = {
 };
 struct radio_link link;
 
-struct protocol_packet packet;
-
-uint8_t res;
-uint8_t data= 1;
-uint8_t buf[LORA_MAX_PACKET_SIZE];
+uint8_t arm = 0;
 uint32_t start_time;
 
 int main(void)
@@ -40,6 +36,7 @@ int main(void)
 	SystemClock_Config();
 	MX_USB_DEVICE_Init();
 	LED_Init();
+	ARM_Btn_Init();
 	SPI_Init();
 	HAL_Delay(5000);
 	radio_link_init(&lora, &link, NODE_GROUND_STATION);
@@ -47,15 +44,21 @@ int main(void)
 	start_time = HAL_GetTick();
 	while (1)
 	{
-		if (HAL_GetTick() - start_time > 500) {
-			radio_checkin(&link, NODE_PAYLOAD);
+
+		if (HAL_GPIO_ReadPin(BTN_PORT, BTN_PIN) == GPIO_PIN_RESET) {
+			//arm = 1;
+			HAL_Delay(500);
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+			radio_link_send(&link, NODE_PAYLOAD, 0x12, NULL, 0);
+		}
+		if (HAL_GetTick() - start_time > 250) {
+			radio_request_data(&link, NODE_PAYLOAD);
 			start_time = HAL_GetTick();
 		}
 
 		radio_rx_process(&link);
-		if (radio_flag == MSG_HEARTBEAT_ACK + NODE_PAYLOAD) {
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-			SerialWrite("Got heartbeat\n");
+		if (radio_flag == MSG_TELEMETRY_ACK + NODE_PAYLOAD) {
+			//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 			radio_flag = 0;
 		}
 	}

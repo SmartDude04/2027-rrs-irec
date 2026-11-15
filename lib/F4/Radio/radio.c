@@ -1,4 +1,5 @@
 #include "radio.h"
+#include "usb_serial.h"
 
 uint8_t radio_checkin(struct radio_link *link, uint8_t destination) {
     if (radio_link_send(link, destination, MSG_HEARTBEAT, NULL, 0) != RADIO_OK) {
@@ -55,11 +56,14 @@ void radio_rx_process(struct radio_link *link) {
                 // Convert rx_packet.data to corresponding packet struct depending on source
                 if (rx_packet.source == NODE_AIRBRAKES) {
                     radio_flag = MSG_TELEMETRY_ACK + NODE_AIRBRAKES;
+                    SerialWrite("%s\n", rx_packet.data);
                     // Save rx_packet.data to airbrake struct
                 }
                 else if (rx_packet.source == NODE_PAYLOAD)
                 {
                     radio_flag = MSG_TELEMETRY_ACK + NODE_PAYLOAD;
+                    SerialWrite("%u:\t%s\n", rx_packet.sequence, rx_packet.data);
+
                     // Save rx_packet.data to payload struct
                 }
                 break;
