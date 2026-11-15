@@ -8,7 +8,7 @@
 /**
  * Performs a double-integration rollout of computed acceleration values on the rocket to estimate an apogee value
  * given airbrake opening amounts for the rest of the flight
- * 
+ *
  * @param airbrake_state List of future airbrake opening amounts
  * @param apogee_index Will be set to the index right after apogee
  * @param cur_altitude Current altitude above the pad, in meters

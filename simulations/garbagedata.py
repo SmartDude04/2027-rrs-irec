@@ -2,13 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-nominal_data = pd.read_csv("nominal-flight.csv")
+nominal_data = pd.read_csv("simulation_linear.csv")
 
 rng = np.random.default_rng(seed=42)
 
 noise_columns = [
     "Vertical acceleration (m/s²)",
-    "Air pressure (Pa)",
+    "Air density (kg/m³)",
 ]
 
 mean = 0.0
@@ -24,7 +24,7 @@ noise = rng.normal(
 
 noisy[noise_columns] = nominal_data[noise_columns] + noise
 
-noisy.to_csv("noise-flight.csv", index=False)
+noisy.to_csv("noise-flight-2.csv", index=False)
 
 plt.figure()
 plt.plot(nominal_data["Time (s)"], nominal_data["Vertical acceleration (m/s²)"], label="Nominal")

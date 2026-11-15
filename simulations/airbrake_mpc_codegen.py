@@ -1,27 +1,3 @@
-"""
-Airbrake MPC -> STM32 via OSQP code generation
-==============================================
-
-This is the embedded-targeted version of airbrake_mpc.py.  Instead of solving
-the QP with the OSQP Python interface at run time, this script
-
-  1. builds the *same* QP (P, q, A, l, u) as airbrake_mpc.AirbrakeMPC,
-  2. calls OSQP's code generator (embedded "matrices" mode, float32) to emit a
-     malloc-free C solver, and
-  3. writes airbrake_config.h so the hand-written C controller in
-     stm32_airbrake_mpc/app/ (flight model, finite-difference gradient, P/q/l/u
-     update, solve) uses exactly the same parameters as the Python model.
-
-Why "matrices" mode: the Taylor-linearized cost changes P (through grad grad^T)
-and q every control step, so both must be updatable on the target.  OSQP's
-embedded mode requires a fixed sparsity pattern, so P is generated with a dense
-upper triangle and A = [I; D] is constant.
-
-Usage
-    python3 airbrake_mpc_codegen.py              # generate + build + verify on host
-    python3 airbrake_mpc_codegen.py --no-test    # generate only
-"""
-
 import argparse
 import os
 import shutil
@@ -39,18 +15,12 @@ OUT = os.path.join(HERE, 'stm32_airbrake_mpc')
 OSQP_DIR = os.path.join(OUT, 'osqp')
 APP_DIR = os.path.join(OUT, 'app')
 
-# ----------------------------------------------------------------------------
-# Flight / tuning configuration (the C controller is generated from these)
-# ----------------------------------------------------------------------------
-# TARGET_APOGEE = 3048.0      # [m]
-# H_BURNOUT = 900.0           # nominal state used to condition the generated solver
-# V_BURNOUT = 280.0
-TARGET_APOGEE = 944.0
+TARGET_APOGEE = 960.0
 H_BURNOUT = 231.0
 V_BURNOUT = 140.0
-DT_INT = 0.05               # flight-model integration step [s]
-FLOAT_EPS = 1e-4            # OSQP tolerances (float32 cannot reach 1e-6)
-OSQP_MAX_ITER = 200         # hard iteration cap = bounded run time on the MCU
+DT_INT = 0.01
+FLOAT_EPS = 1e-4
+OSQP_MAX_ITER = 200
 
 
 def make_controller():
