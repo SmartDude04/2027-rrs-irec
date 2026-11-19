@@ -5,17 +5,19 @@
 
 SPI_HandleTypeDef hspi1;
 
+SPI_HandleTypeDef hspi1;
+
 void SPI_Init(void)
 {
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
+    // Configure the radio NSS and RESET pins as GPIO outputs.
     // Configure the radio NSS and RESET pins as GPIO outputs.
     GPIO_InitTypeDef gpio = {0};
 
     gpio.Pin = GPIO_PIN_2 | GPIO_PIN_1;
-//     gpio.Pin = GPIO_PIN_4 | GPIO_PIN_3;     // From old code that was merged in, not sure if needed -Matt
-  
     gpio.Mode = GPIO_MODE_OUTPUT_PP;
     gpio.Pull = GPIO_NOPULL;
     gpio.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -23,8 +25,6 @@ void SPI_Init(void)
 
     // Keep radio deselected and reset inactive.
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2 | GPIO_PIN_1, GPIO_PIN_SET);
-//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);        // From old code that was merged in
-//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
 
     hspi1.Instance = SPI1;
     hspi1.Init.Mode = SPI_MODE_MASTER;
@@ -59,25 +59,23 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
         __HAL_RCC_SPI1_CLK_ENABLE();
         __HAL_RCC_GPIOA_CLK_ENABLE();
         __HAL_RCC_GPIOB_CLK_ENABLE();
+        __HAL_RCC_GPIOB_CLK_ENABLE();
 
         /**SPI1 GPIO Configuration
         PA5     ------> SPI1_SCK
         PB4     ------> SPI1_MISO
+        PB4     ------> SPI1_MISO
         PA7     ------> SPI1_MOSI
         */
         GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_7;
-
-//         /**SPI1 GPIO Configuration
-//         PA5     ------> SPI1_SCK
-//         PA6     ------> SPI1_MISO
-//         PA7     ------> SPI1_MOSI
-//         */
-//         GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;     // From old code that was merged in, not sure if needed
         GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
         GPIO_InitStruct.Pull = GPIO_NOPULL;
         GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
         GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
         HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+        GPIO_InitStruct.Pin = GPIO_PIN_4;
+        HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
         GPIO_InitStruct.Pin = GPIO_PIN_4;
         HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);

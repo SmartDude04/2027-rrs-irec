@@ -70,7 +70,6 @@ HAL_StatusTypeDef ICM_StartGyro(struct ICM *dev);
 void ICM_GetAccel(struct ICM *dev);
 void ICM_GetGyro(struct ICM *dev,bool degrees);
 void ICM_init(struct ICM *dev);
-
-
+void ICM_setLowPower(bool lowPower);
 
 #endif
